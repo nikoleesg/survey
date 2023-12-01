@@ -3,14 +3,15 @@
 namespace Nikoleesg\Survey\Facades;
 
 use Illuminate\Support\Facades\Facade;
+use Nikoleesg\Survey\Services\DataService;
 
 /**
- * @see \Nikoleesg\Survey\SurveyService
+ * @see \Nikoleesg\Survey\DataService
  */
-class Survey extends Facade
+class Data extends Facade
 {
     protected static function getFacadeAccessor()
     {
-        return \Nikoleesg\Survey\SurveyService::class;
+        return DataService::class;
     }
 }
