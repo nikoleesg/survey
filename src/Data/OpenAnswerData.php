@@ -13,7 +13,7 @@ class OpenAnswerData extends Data
         public int $length,
         public ?int $code_number,
         public string $verbatim_text,
-        public string $survey_name,
+        public string $survey_id,
         public string $open_answer_md5
     ) {}
 
