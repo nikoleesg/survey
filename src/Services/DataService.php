@@ -27,10 +27,10 @@ class DataService
 
     /**
      * @param string $fileName
-     * @param string $surveyName
+     * @param string $surveyId
      * @return DataCollection
      */
-    public function getOpenAnswersFromFile(string $fileName, string $surveyName): DataCollection
+    public function getOpenAnswersFromFile(string $fileName, string $surveyId): DataCollection
     {
         $filePath = Storage::path($fileName);
 
@@ -45,7 +45,7 @@ class DataService
                 $openAnswer = $this->getOpenAnswerFromString($row);
 
                 $rows[] = array_merge($openAnswer, [
-                    'survey_name' => $surveyName,
+                    'survey_id' => $surveyId,
                     'open_answer_md5' => $this->getOpenAnswerMd5($openAnswer)
                 ]);
             }
@@ -82,7 +82,7 @@ class DataService
      */
     protected function getOpenAnswerMd5(array $openAnswer): string
     {
-        $fields = ['interview_number', 'sub_questionnaire_number', 'position', 'length', 'code_number', 'survey_name'];
+        $fields = ['interview_number', 'sub_questionnaire_number', 'position', 'length', 'code_number', 'survey_id'];
 
         $index = Arr::join(array_values(Arr::only($openAnswer, $fields)), '_');
 

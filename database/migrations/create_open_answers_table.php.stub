@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('length');
             $table->unsignedSmallInteger('code_number')->nullable();
             $table->mediumText('verbatim_text');
-            $table->string('survey_name');
+            $table->string('survey_id');
             $table->string('open_answer_md5')->unique();
             $table->timestamps();
         });

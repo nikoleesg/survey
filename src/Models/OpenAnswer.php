@@ -14,9 +14,9 @@ class OpenAnswer extends Model
     protected $guarded = [];
 
 
-    public function scopeSurvey(Builder $query, string $surveyName): void
+    public function scopeSurvey(Builder $query, string $surveyId): void
     {
-        $query->where('survey_name', $surveyName);
+        $query->where('survey_id', $surveyId);
     }
 
     public function scopeSample(Builder $query, int $interviewNumber): void
