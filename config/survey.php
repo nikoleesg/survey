@@ -10,8 +10,14 @@ return [
     */
     'table_prefix' => 'survey_',
 
-    'open_answer_model' => Nikoleesg\Survey\Models\OpenAnswer::class,
+    /*
+    |-------------------------------------------------------------------------
+    | Database model
+    |-------------------------------------------------------------------------
+    |
+    */
+    'open_answer_model' => \Nikoleesg\Survey\Models\OpenAnswer::class,
 
-
+    'paradata_model' => \Nikoleesg\Survey\Models\Paradata::class,
 
 ];
