@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use LaraUtil\Foundation\Traits\HasUuid;
 use Nikoleesg\Survey\Traits\HasTablePrefix;
 
-class OpenAnswer extends Model
+class Paradata extends Model
 {
     use HasUuid, HasTablePrefix;
 
