@@ -20,7 +20,8 @@ class SurveyServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasViews()
             ->hasMigrations([
-                'create_open_answers_table'
+                'create_open_answers_table',
+                'create_paradatas_table'
             ])
             ->hasCommand(SurveyCommand::class);
     }
