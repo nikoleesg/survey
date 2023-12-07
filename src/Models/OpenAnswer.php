@@ -4,13 +4,12 @@ namespace Nikoleesg\Survey\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Awobaz\Compoships\Compoships;
 use LaraUtil\Foundation\Traits\HasUuid;
 use Nikoleesg\Survey\Traits\HasTablePrefix;
 
 class OpenAnswer extends Model
 {
-    use HasUuid, HasTablePrefix, Compoships;
+    use HasUuid, HasTablePrefix;
 
     protected $guarded = [];
 
