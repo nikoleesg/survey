@@ -4,21 +4,22 @@ namespace Nikoleesg\Survey\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Awobaz\Compoships\Compoships;
 use LaraUtil\Foundation\Traits\HasUuid;
 use Nikoleesg\Survey\Traits\HasTablePrefix;
 
 class OpenAnswer extends Model
 {
-    use HasUuid, HasTablePrefix;
+    use HasUuid, HasTablePrefix, Compoships;
 
     protected $guarded = [];
 
-    public function scopeSurvey(Builder $query, string $surveyId): void
+    public function scopeOfSurvey(Builder $query, string $surveyId): void
     {
         $query->where('survey_id', $surveyId);
     }
 
-    public function scopeSample(Builder $query, int $interviewNumber): void
+    public function scopeOfSample(Builder $query, int $interviewNumber): void
     {
         $query->where('interview_number', $interviewNumber);
     }
