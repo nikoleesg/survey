@@ -6,18 +6,24 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 use Spatie\LaravelData\DataCollection;
 use SplFileObject;
+use Carbon\Carbon;
+use Nikoleesg\Survey\Models\Variable;
+use Nikoleesg\Survey\Models\OpenAnswer;
+use Nikoleesg\Survey\Enums\VariableTypeEnum;
 use Nikoleesg\Survey\Data\OpenAnswerData;
 use Nikoleesg\Survey\Data\ParadataData;
+use Nikoleesg\Survey\Data\ClosedAnswerData;
+use Nikoleesg\Survey\Data\AnswerData;
 
 class DataService implements Arrayable
 {
     protected string $surveyId;
 
     protected DataCollection $data;
-
 
     public function setSurvey(string $surveyId): self
     {
@@ -31,13 +37,170 @@ class DataService implements Arrayable
      * @param string|null $surveyId
      * @return $this
      */
+    public function getClosedAnswersFromFile(string $fileName, ?string $surveyId = null): self
+    {
+        $surveyId = $surveyId ?? $this->surveyId ?? null;
+
+        if ($surveyId === null) {
+            // throw exception
+            return $this;
+        }
+
+        $filePath = Storage::path($fileName);
+
+        $content = new SplFileObject($filePath);
+
+        $result = [];
+
+        // get Survey Id
+        $surveyId = $this->surveyId;
+
+        // get Variables of survey (active)
+        $variables = Variable::query()->active()->ofSurvey($surveyId)->get();
+
+        while (!$content->eof()) {
+
+            if (Str::length($row = $content->fgets()) > 1) {
+
+                $string = preg_replace('/[[:^print:]]/', '', $row);
+
+                // parse closed answer of system variables
+                $closedAnswer = ClosedAnswerData::from($string);
+
+                // Parse answers of variables...
+                $interviewNumber = $closedAnswer->interview_number;
+
+                $variableAnswers = $this->getVariableAnswers($surveyId, $interviewNumber, $variables, $string);
+
+                Log::debug('{answerCnt} answers loaded for {interviewNumber}.', [
+                    'answerCnt'       => $variableAnswers->count(),
+                    'interviewNumber' => $interviewNumber,
+                    'answers'         => $variableAnswers->toJson()
+                ]);
+
+                // append sample's answer to result
+                foreach ($variableAnswers as $variableAnswer) {
+                    $result[] = $variableAnswer;
+                }
+            }
+        }
+
+        Log::debug('{numOfAnswer} answers loaded.', [
+            'numOfAnswer' => count($result),
+            'result' => $result
+        ]);
+
+        $this->data = AnswerData::collection($result);
+
+        return $this;
+    }
+
+    protected function getVariableAnswers(string $surveyId, int $interviewNumber, Collection $variables, string $string): DataCollection
+    {
+        $answers = [];
+
+        Log::debug('Get variables answer from raw data.', [
+            'survey_id'        => $surveyId,
+            'interview_number' => $interviewNumber,
+            'variables'        => $variables->toJson(),
+            'closed_answer'    => $string
+        ]);
+
+        foreach ($variables as $variable) {
+
+            // get content from columns
+            $startPosition = (int)$variable->position;
+            $length        = (int)$variable->length;
+            $fraction      = (int)$variable->fraction;
+
+            $contentOfColumns = Str::substr($string, $startPosition - 1, $length + $fraction);
+
+            Log::debug('Extract content from closed answer: {contentOfColumns}', [
+                'contentOfColumns' => $contentOfColumns,
+                'position'         => $startPosition,
+                'length'           => $length,
+                'fraction'         => $fraction
+            ]);
+
+            // map content to result
+
+            // TODO: load open answer; load multiple open answer for multiple answer; calculation, dummy
+            $data = match ($variable->type) {
+                VariableTypeEnum::SINGLE     => (int)$contentOfColumns,
+                VariableTypeEnum::MULTIPLE   => str_split($contentOfColumns),
+                VariableTypeEnum::NUMERICAL  => $fraction > 0 ? (int)$contentOfColumns / pow(10, $fraction) : (int)$contentOfColumns,
+                VariableTypeEnum::OPEN       => $this->getVerbatimText($surveyId, $interviewNumber, $startPosition, $length),
+                VariableTypeEnum::ALPHA      => $contentOfColumns,
+                VariableTypeEnum::CALCULABLE => null,
+                VariableTypeEnum::DUMMY      => null,
+                VariableTypeEnum::DATETIME   => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateTimeString(),
+                VariableTypeEnum::DATE       => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateString(),
+                VariableTypeEnum::TIME       => Carbon::createFromFormat('Hi', $contentOfColumns)->toTimeString(),
+            };
+
+            $result = [];
+
+            foreach (!is_array($data) ? [$data] : $data as $key => $item) {
+                // add result, variable name as key, answer as value
+                $variable_name = $variable->type === VariableTypeEnum::MULTIPLE ? $variable->slug.'_'.$key : $variable->slug;
+
+                $result = Arr::add($result, $variable_name, $item);
+
+            }
+
+            $answerData = [
+                'survey_id'        => $surveyId,
+                'variable_id'      => $variable->id,
+                'interview_number' => $interviewNumber,
+                'result'           => $result,
+            ];
+
+            $answer = array_merge($answerData,[
+                'answer_md5' => $this->md5hash($answerData, ['variable_id', 'interview_number'])
+            ]);
+
+            Log::debug('Answer of {variable} for {interviewNumber} is: {answer}', [
+                'variable'        => $variable->name,
+                'interviewNumber' => $interviewNumber,
+                'answer'          => json_encode($answer)
+            ]);
+
+            array_push($answers, $answer);
+        }
+
+        return AnswerData::collection($answers);
+    }
+
+    /**
+     * @param string $surveyId
+     * @param string $interviewNumber
+     * @param int $position
+     * @param int $length
+     * @return string|null
+     */
+    protected function getVerbatimText(string $surveyId, string $interviewNumber, int $position, int $length): ?string
+    {
+        return OpenAnswer::query()->where([
+            'survey_id'        => $surveyId,
+            'interview_number' => $interviewNumber,
+            'position'         => $position,
+            'length'           => $length
+        ])->first()?->verbatim_text;
+    }
+
+
+    /**
+     * @param string $fileName
+     * @param string|null $surveyId
+     * @return $this
+     */
     public function getParadatafromFile(string $fileName, ?string $surveyId = null): self
     {
         $surveyId = $surveyId ?? $this->surveyId ?? null;
 
         if ($surveyId === null) {
             // throw exception
-            return false;
+            return $this;
         }
 
         $csvContent = $this->getCsvFileContent($fileName);
@@ -85,7 +248,7 @@ class DataService implements Arrayable
 
         if ($surveyId === null) {
             // throw exception
-            return false;
+            return $this;
         }
 
         $filePath = Storage::path($fileName);
