@@ -4,10 +4,16 @@ namespace Nikoleesg\Survey\Traits;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Awobaz\Compoships\Compoships;
 
 trait HasParadata
 {
-    abstract public function paradata(): HasMany;
+    use Compoships;
+
+    public function paradata(): HasMany
+    {
+        return $this->hasMany(Paradata::class, ['interview_number', 'survey_id'], ['interview_id', 'survey_id']);
+    }
 
     public function paradataOfAddress(): HasOne
     {
@@ -109,5 +115,5 @@ trait HasParadata
     {
         return $this->paradata()->one()->ofInterviewQuality();
     }
-    
+
 }
