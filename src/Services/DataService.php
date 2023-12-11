@@ -127,7 +127,7 @@ class DataService implements Arrayable
             // TODO: load open answer; load multiple open answer for multiple answer; calculation, dummy
             $data = match ($variable->type) {
                 VariableTypeEnum::SINGLE     => (int)$contentOfColumns,
-                VariableTypeEnum::MULTIPLE   => str_split($contentOfColumns),
+                VariableTypeEnum::MULTIPLE   => array_map('intval', str_split($contentOfColumns)),
                 VariableTypeEnum::NUMERICAL  => $fraction > 0 ? (int)$contentOfColumns / pow(10, $fraction) : (int)$contentOfColumns,
                 VariableTypeEnum::OPEN       => $this->getVerbatimText($surveyId, $interviewNumber, $startPosition, $length),
                 VariableTypeEnum::ALPHA      => $contentOfColumns,
@@ -140,12 +140,11 @@ class DataService implements Arrayable
 
             $result = [];
 
-            foreach (!is_array($data) ? [$data] : $data as $key => $item) {
+            foreach (!is_array($data) ? [$data] : $data as $key => $value) {
                 // add result, variable name as key, answer as value
-                $variable_name = $variable->type === VariableTypeEnum::MULTIPLE ? $variable->slug.'_'.$key : $variable->slug;
+                $variable_name = $variable->type === VariableTypeEnum::MULTIPLE ? $variable->slug.'_'.$key+1 : $variable->slug;
 
-                $result = Arr::add($result, $variable_name, $item);
-
+                $result = Arr::add($result, $variable_name, $value);
             }
 
             $answerData = [

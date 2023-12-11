@@ -16,4 +16,22 @@ trait HasAnswers
         return $this->hasMany(Answer::class, ['interview_number', 'survey_id'], ['interview_id', 'survey_id']);
     }
 
+    /**
+     * get survey sample answers
+     * @return array
+     */
+    public function getAnswers(): array
+    {
+        $answerRelation = $this->relationLoaded('answers') ? $this->answers : $this->answers();
+
+        $answers = [];
+
+        $answerRelation->pluck('result')
+            ->each(function ($item) use (&$answers) {
+                $answers = array_merge($answers, $item);
+            });
+
+        return $answers;
+    }
+
 }
