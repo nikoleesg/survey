@@ -22,6 +22,7 @@ return new class extends Migration
 
             $table->unsignedTinyInteger('type');
             $table->text('codes')->nullable();
+            $table->text('attributes')->nullable();
             $table->unsignedInteger('position')->nullable();
             $table->unsignedInteger('length')->nullable();
             $table->unsignedInteger('fraction')->nullable();
