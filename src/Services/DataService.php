@@ -7,7 +7,6 @@ use Illuminate\Support\Str;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Log;
 use Spatie\LaravelData\DataCollection;
 use SplFileObject;
 use Carbon\Carbon;
@@ -72,23 +71,12 @@ class DataService implements Arrayable
 
                 $variableAnswers = $this->getVariableAnswers($surveyId, $interviewNumber, $variables, $string);
 
-                Log::debug('{answerCnt} answers loaded for {interviewNumber}.', [
-                    'answerCnt'       => $variableAnswers->count(),
-                    'interviewNumber' => $interviewNumber,
-                    'answers'         => $variableAnswers->toJson()
-                ]);
-
                 // append sample's answer to result
                 foreach ($variableAnswers as $variableAnswer) {
                     $result[] = $variableAnswer;
                 }
             }
         }
-
-        Log::debug('{numOfAnswer} answers loaded.', [
-            'numOfAnswer' => count($result),
-            'result' => $result
-        ]);
 
         $this->data = AnswerData::collection($result);
 
@@ -99,13 +87,6 @@ class DataService implements Arrayable
     {
         $answers = [];
 
-        Log::debug('Get variables answer from raw data.', [
-            'survey_id'        => $surveyId,
-            'interview_number' => $interviewNumber,
-            'variables'        => $variables->toJson(),
-            'closed_answer'    => $string
-        ]);
-
         foreach ($variables as $variable) {
 
             // get content from columns
@@ -115,34 +96,27 @@ class DataService implements Arrayable
 
             $contentOfColumns = Str::substr($string, $startPosition - 1, $length + $fraction);
 
-            Log::debug('Extract content from closed answer: {contentOfColumns}', [
-                'contentOfColumns' => $contentOfColumns,
-                'position'         => $startPosition,
-                'length'           => $length,
-                'fraction'         => $fraction
-            ]);
-
             // map content to result
 
             // TODO: load open answer; load multiple open answer for multiple answer; calculation, dummy
             $data = match ($variable->type) {
-                VariableTypeEnum::SINGLE     => (int)$contentOfColumns,
-                VariableTypeEnum::MULTIPLE   => array_map('intval', str_split($contentOfColumns)),
-                VariableTypeEnum::NUMERICAL  => $fraction > 0 ? (int)$contentOfColumns / pow(10, $fraction) : (int)$contentOfColumns,
-                VariableTypeEnum::OPEN       => $this->getVerbatimText($surveyId, $interviewNumber, $startPosition, $length),
-                VariableTypeEnum::ALPHA      => $contentOfColumns,
+                VariableTypeEnum::SINGLE => (int)$contentOfColumns,
+                VariableTypeEnum::MULTIPLE => array_map('intval', str_split($contentOfColumns)),
+                VariableTypeEnum::NUMERICAL => $fraction > 0 ? (int)$contentOfColumns / pow(10, $fraction) : (int)$contentOfColumns,
+                VariableTypeEnum::OPEN => $this->getVerbatimText($surveyId, $interviewNumber, $startPosition, $length),
+                VariableTypeEnum::ALPHA => $contentOfColumns,
                 VariableTypeEnum::CALCULABLE => null,
-                VariableTypeEnum::DUMMY      => null,
-                VariableTypeEnum::DATETIME   => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateTimeString(),
-                VariableTypeEnum::DATE       => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateString(),
-                VariableTypeEnum::TIME       => Carbon::createFromFormat('Hi', $contentOfColumns)->toTimeString(),
+                VariableTypeEnum::DUMMY => null,
+                VariableTypeEnum::DATETIME => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateTimeString(),
+                VariableTypeEnum::DATE => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateString(),
+                VariableTypeEnum::TIME => Carbon::createFromFormat('Hi', $contentOfColumns)->toTimeString(),
             };
 
             $result = [];
 
             foreach (!is_array($data) ? [$data] : $data as $key => $value) {
                 // add result, variable name as key, answer as value
-                $variable_name = $variable->type === VariableTypeEnum::MULTIPLE ? $variable->slug.'_'.$key+1 : $variable->slug;
+                $variable_name = $variable->type === VariableTypeEnum::MULTIPLE ? $variable->slug . '_' . $key + 1 : $variable->slug;
 
                 $result = Arr::add($result, $variable_name, $value);
             }
@@ -154,14 +128,9 @@ class DataService implements Arrayable
                 'result'           => $result,
             ];
 
-            $answer = array_merge($answerData,[
-                'answer_md5' => $this->md5hash($answerData, ['variable_id', 'interview_number'])
-            ]);
-
-            Log::debug('Answer of {variable} for {interviewNumber} is: {answer}', [
-                'variable'        => $variable->name,
-                'interviewNumber' => $interviewNumber,
-                'answer'          => json_encode($answer)
+            $answer = array_merge($answerData, [
+                'answer_md5' => $this->md5hash($answerData, ['variable_id',
+                    'interview_number'])
             ]);
 
             array_push($answers, $answer);
@@ -219,14 +188,17 @@ class DataService implements Arrayable
             foreach ($matches as $match) {
 
                 $paraData = [
-                    'interview_number' => (int)$match[1],  // Convert the first column to an integer
+                    'interview_number' => (int)$match[1],
+                    // Convert the first column to an integer
                     'label'            => $match[2],
-                    'result'           => str_replace(["\r", "\n"], '', $match[3]),
+                    'result'           => str_replace(["\r",
+                        "\n"], '', $match[3]),
                 ];
 
                 $result[] = array_merge($paraData, [
                     'survey_id'    => $surveyId,
-                    'paradata_md5' => $this->md5hash($paraData, ['interview_number', 'label'])
+                    'paradata_md5' => $this->md5hash($paraData, ['interview_number',
+                        'label'])
                 ]);
             }
         }
@@ -264,7 +236,11 @@ class DataService implements Arrayable
 
                 $result[] = array_merge($openAnswer, [
                     'survey_id'       => $surveyId,
-                    'open_answer_md5' => $this->md5hash($openAnswer, ['interview_number', 'sub_questionnaire_number', 'position', 'length', 'code_number'])
+                    'open_answer_md5' => $this->md5hash($openAnswer, ['interview_number',
+                        'sub_questionnaire_number',
+                        'position',
+                        'length',
+                        'code_number'])
                 ]);
             }
         }
@@ -344,9 +320,9 @@ class DataService implements Arrayable
         }
 
         $dataModel = match ($this->getData()->getDataClass()) {
-            OpenAnswerData::class => config('survey.open_answer_model'),
+            OpenAnswerData::class   => config('survey.open_answer_model'),
             ClosedAnswerData::class => config('survey.closed_answer_model'),
-            ParadataData::class => config('survey.paradata_model'),
+            ParadataData::class     => config('survey.paradata_model')
         };
 
         $data = collect($this->getData()->toArray())
@@ -367,7 +343,9 @@ class DataService implements Arrayable
         });
 
         // update columns
-        $upsertKeys = Arr::except($dataKeys, [$uniqueKey, 'uuid', 'id']);
+        $upsertKeys = Arr::except($dataKeys, [$uniqueKey,
+            'uuid',
+            'id']);
 
         // chunk upsert
         $size = config('survey.persist_chunk_size');
@@ -386,7 +364,6 @@ class DataService implements Arrayable
 
     public function toArray(): array
     {
-        // TODO: Implement toArray() method.
         return $this->data instanceof DataCollection ? $this->data->toArray() : [];
     }
 }
