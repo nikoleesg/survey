@@ -344,8 +344,9 @@ class DataService implements Arrayable
         }
 
         $dataModel = match ($this->getData()->getDataClass()) {
-            'Nikoleesg\Survey\Data\OpenAnswerData' => config('survey.open_answer_model'),
-            'Nikoleesg\Survey\Data\ParadataData' => config('survey.paradata_model'),
+            OpenAnswerData::class => config('survey.open_answer_model'),
+            ClosedAnswerData::class => config('survey.closed_answer_model'),
+            ParadataData::class => config('survey.paradata_model'),
         };
 
         $data = collect($this->getData()->toArray())
@@ -368,7 +369,12 @@ class DataService implements Arrayable
         // update columns
         $upsertKeys = Arr::except($dataKeys, [$uniqueKey, 'uuid', 'id']);
 
-        $dataModel::upsert($data->toArray(), [$uniqueKey], $upsertKeys);
+        // chunk upsert
+        $size = config('survey.persist_chunk_size');
+
+        foreach ($data->chunk(config('survey.persist_chunk_size')) as $chunk) {
+            $dataModel::upsert($chunk->toArray(), [$uniqueKey], $upsertKeys);
+        }
 
         return $this;
     }
