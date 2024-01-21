@@ -61,7 +61,7 @@ class AnswerService
         return $this;
     }
 
-    public function getAnswers(array|EloquentCollection|null $filteredVariable = null, int|array|null $filteredInterview = null)
+    public function getAnswers(int|array|null $filteredInterview = null, array|EloquentCollection|null $filteredVariable = null)
     {
         if (is_null($this->surveyId)) {
             // TODO: exception
@@ -121,6 +121,17 @@ class AnswerService
             })
             ->groupBy('interview_number');
 
+    }
+
+    public function getAnswer(int $interviewId, int $variableId)
+    {
+        $answer = Arr::get($this->getAnswers([$interviewId], [$variableId]), $interviewId, null);
+
+        if (is_null($answer)) {
+            return null;
+        }
+
+        return $answer->first();
     }
 
     protected function isIntegerList($array): bool
