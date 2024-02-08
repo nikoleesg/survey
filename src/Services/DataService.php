@@ -45,9 +45,7 @@ class DataService implements Arrayable
             return $this;
         }
 
-        $filePath = Storage::path($fileName);
-
-        $content = new SplFileObject($filePath);
+        $content = new SplFileObject($fileName);
 
         $result = [];
 
@@ -222,9 +220,7 @@ class DataService implements Arrayable
             return $this;
         }
 
-        $filePath = Storage::path($fileName);
-
-        $content = new SplFileObject($filePath);
+        $content = new SplFileObject($fileName);
 
         $result = [];
 
