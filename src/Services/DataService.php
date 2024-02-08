@@ -285,10 +285,8 @@ class DataService implements Arrayable
      */
     protected function getCsvFileContent(string $fileName, string $encode = 'UTF-16LE'): string
     {
-        $filePath = Storage::path($fileName);
-
         // Open the file with read-only access
-        $fileHandle = fopen($filePath, 'r');
+        $fileHandle = fopen($fileName, 'r');
 
         $firstLine = fgets($fileHandle);
 
