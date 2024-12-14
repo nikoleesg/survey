@@ -4,12 +4,11 @@ namespace Nikoleesg\Survey\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use LaraUtil\Foundation\Traits\HasUuid;
 use Nikoleesg\Survey\Traits\HasTablePrefix;
 
 class Paradata extends Model
 {
-    use HasUuid, HasTablePrefix;
+    use HasTablePrefix;
 
     protected $guarded = [];
 
