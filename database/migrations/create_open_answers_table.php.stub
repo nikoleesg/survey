@@ -13,16 +13,17 @@ return new class extends Migration
     {
         Schema::create(config('survey.table_prefix').'open_answers', function (Blueprint $table) {
             $table->id();
-            $table->uuid('uuid');
+
+            $table->string('survey_id');
             $table->unsignedBigInteger('interview_number');
             $table->unsignedTinyInteger('sub_questionnaire_number');
             $table->unsignedMediumInteger('position');
             $table->unsignedSmallInteger('length');
             $table->unsignedSmallInteger('code_number')->nullable();
             $table->mediumText('verbatim_text');
-            $table->string('survey_id');
-            $table->string('open_answer_md5')->unique();
             $table->timestamps();
+
+            $table->unique(['survey_id', 'interview_number', 'position', 'length', 'code_number'], 'unique_open_answers');
         });
     }
 

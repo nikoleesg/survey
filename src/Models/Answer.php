@@ -8,13 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Spatie\LaravelData\WithData;
 use Awobaz\Compoships\Compoships;
-use LaraUtil\Foundation\Traits\HasUuid;
 use Nikoleesg\Survey\Traits\HasTablePrefix;
 use Nikoleesg\Survey\Data\AnswerData;
 
 class Answer extends Model
 {
-    use HasUuid, HasTablePrefix;
+    use HasTablePrefix;
     use WithData, Compoships;
 
     protected $guarded = [];

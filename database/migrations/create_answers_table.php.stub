@@ -13,27 +13,13 @@ return new class extends Migration
     {
         Schema::create(config('survey.table_prefix').'answers', function (Blueprint $table) {
             $table->id();
-            $table->uuid('uuid');
-//            $table->morphs('sample');
-
             $table->string('survey_id');
             $table->unsignedBigInteger('variable_id');
             $table->unsignedBigInteger('interview_number');
-            $table->string('answer_md5')->unique();
-
             $table->mediumText('result');
-
-//            $table->unsignedTinyInteger('type');
-//
-//            $table->unsignedInteger('code_answer')->nullable();
-//            $table->boolean('boolean_answer')->nullable();
-//            $table->float('number_answer', 13, 5)->nullable();
-//            $table->text('string_answer')->nullable();
-//            $table->date('date_answer')->nullable();
-//            $table->time('time_answer')->nullable();
-//            $table->dateTime('datetime_answer')->nullable();
-
             $table->timestamps();
+
+            $table->unique(['survey_id', 'variable_id', 'interview_number']);
         });
     }
 

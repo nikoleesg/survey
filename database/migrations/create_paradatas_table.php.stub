@@ -13,13 +13,13 @@ return new class extends Migration
     {
         Schema::create(config('survey.table_prefix').'paradatas', function (Blueprint $table) {
             $table->id();
-            $table->uuid('uuid');
+            $table->string('survey_id');
             $table->unsignedBigInteger('interview_number');
             $table->string('label');
             $table->mediumText('result')->nullable();
-            $table->string('survey_id');
-            $table->string('paradata_md5')->unique();
             $table->timestamps();
+
+            $table->unique(['survey_id', 'interview_number', 'label']);
         });
     }
 
