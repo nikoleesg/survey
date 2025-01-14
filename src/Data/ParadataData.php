@@ -11,7 +11,6 @@ class ParadataData extends Data
         public string $label,
         public ?string $result,
         public string $survey_id,
-        public string $paradata_md5
     ) {}
 
 }

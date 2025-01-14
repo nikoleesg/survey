@@ -14,7 +14,6 @@ class AnswerData extends Data
         public string $survey_id,
         public int $variable_id,
         public int $interview_number,
-        public string $answer_md5,
         #[WithTransformer(JsonableTransformer::class)]
         public array $result
 //        public int $type,
