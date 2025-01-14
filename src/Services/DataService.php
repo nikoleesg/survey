@@ -126,12 +126,7 @@ class DataService implements Arrayable
                 'result'           => $result,
             ];
 
-            $answer = array_merge($answerData, [
-                'answer_md5' => $this->md5hash($answerData, ['variable_id',
-                    'interview_number'])
-            ]);
-
-            array_push($answers, $answer);
+            $answers[] = $answerData;
         }
 
         return AnswerData::collection($answers);
@@ -194,9 +189,7 @@ class DataService implements Arrayable
                 ];
 
                 $result[] = array_merge($paraData, [
-                    'survey_id'    => $surveyId,
-                    'paradata_md5' => $this->md5hash($paraData, ['interview_number',
-                        'label'])
+                    'survey_id'    => $surveyId
                 ]);
             }
         }
@@ -232,11 +225,6 @@ class DataService implements Arrayable
 
                 $result[] = array_merge($openAnswer, [
                     'survey_id'       => $surveyId,
-                    'open_answer_md5' => $this->md5hash($openAnswer, ['interview_number',
-                        'sub_questionnaire_number',
-                        'position',
-                        'length',
-                        'code_number'])
                 ]);
             }
         }
@@ -266,16 +254,6 @@ class DataService implements Arrayable
             'code_number'              => $posNineteen === "" ? null : intval($posNineteen),
             'verbatim_text'            => Str::after($string, ' ')
         ];
-    }
-
-    /**
-     * @param array $data
-     * @param array $fields
-     * @return string
-     */
-    protected function md5hash(array $data, array $fields): string
-    {
-        return md5(Arr::join(array_values(Arr::only($data, $fields)), '_') . '_' . $this->surveyId);
     }
 
     /**
