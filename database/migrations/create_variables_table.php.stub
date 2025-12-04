@@ -29,6 +29,7 @@ return new class extends Migration
             $table->text('formula')->nullable();
 
             $table->text('remark')->nullable();
+            $table->boolean('is_dynamic')->default(false);
             $table->boolean('status')->default(true);
             $table->unsignedInteger('order_column')->nullable();
 
