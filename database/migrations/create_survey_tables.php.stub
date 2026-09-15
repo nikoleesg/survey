@@ -9,7 +9,7 @@ return new class extends Migration
     /**
      * Run the migrations.
      *
-     * Order matters: samples and variables first, the three tables that
+     * Order matters: samples and variables first, the two tables that
      * reference them after.
      */
     public function up(): void
@@ -70,20 +70,6 @@ return new class extends Migration
             $table->unique(['sample_id', 'variable_id']);
         });
 
-        Schema::create('survey_open_answers', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('sample_id')->constrained('survey_samples')->cascadeOnDelete();
-            $table->unsignedTinyInteger('sub_questionnaire_number')->nullable();
-            $table->unsignedMediumInteger('position');
-            $table->unsignedSmallInteger('length');
-            // NOT NULL so it can take part in the unique key (NULLs never collide)
-            $table->unsignedSmallInteger('code_number')->default(0);
-            $table->mediumText('verbatim_text');
-            $table->timestamps();
-
-            $table->unique(['sample_id', 'position', 'length', 'code_number'], 'unique_open_answers');
-        });
-
         Schema::create('survey_paradatas', function (Blueprint $table) {
             $table->id();
             $table->foreignId('sample_id')->constrained('survey_samples')->cascadeOnDelete();
@@ -101,7 +87,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('survey_paradatas');
-        Schema::dropIfExists('survey_open_answers');
         Schema::dropIfExists('survey_answers');
         Schema::dropIfExists('survey_samples');
         Schema::dropIfExists('survey_variables');

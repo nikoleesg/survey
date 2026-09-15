@@ -59,11 +59,6 @@ class Sample extends Model
         return $answers;
     }
 
-    public function openAnswers(): HasMany
-    {
-        return $this->hasMany(config('survey.open_answer_model'), 'sample_id');
-    }
-
     public function paradata(): HasMany
     {
         return $this->hasMany(config('survey.paradata_model'), 'sample_id');

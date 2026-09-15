@@ -13,9 +13,7 @@ use SplFileObject;
 use Carbon\Carbon;
 use Carbon\Exceptions\InvalidFormatException;
 use Nikoleesg\Survey\Models\Variable;
-use Nikoleesg\Survey\Models\OpenAnswer;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
-use Nikoleesg\Survey\Data\OpenAnswerData;
 use Nikoleesg\Survey\Data\ParadataData;
 use Nikoleesg\Survey\Data\ClosedAnswerData;
 use Nikoleesg\Survey\Data\AnswerData;
@@ -82,8 +80,13 @@ class DataService implements Arrayable
 
         $result = [];
 
-        // get Variables of survey (active)
-        $variables = Variable::query()->active()->ofSurvey($surveyId)->get();
+        // OPEN variables are owned by getOpenAnswersFromFile(); emitting a
+        // row for them here would let a later closed load wipe the verbatim
+        $variables = Variable::query()
+            ->active()
+            ->ofSurvey($surveyId)
+            ->whereNot('type', VariableTypeEnum::OPEN)
+            ->get();
 
         while (!$content->eof()) {
 
@@ -129,9 +132,8 @@ class DataService implements Arrayable
 
             // map content to result
 
-            // TODO: load open answer; load multiple open answer for multiple answer; calculation, dummy
+            // TODO: calculation, dummy
             $data = match ($variable->type) {
-                VariableTypeEnum::OPEN => $this->getVerbatimText($surveyId, $interviewNumber, $startPosition, $length),
                 VariableTypeEnum::CALCULABLE => null,
                 VariableTypeEnum::MATRIX => null, // TODO: matrix answers
                 VariableTypeEnum::DUMMY => null,
@@ -186,25 +188,6 @@ class DataService implements Arrayable
     }
 
     /**
-     * @param string $surveyId
-     * @param int $interviewNumber
-     * @param int $position
-     * @param int $length
-     * @return string|null
-     */
-    protected function getVerbatimText(string $surveyId, int $interviewNumber, int $position, int $length): ?string
-    {
-        return OpenAnswer::query()
-            ->whereHas('sample', fn ($query) => $query
-                ->ofSurvey($surveyId)
-                ->where('interview_number', $interviewNumber))
-            ->where('position', $position)
-            ->where('length', $length)
-            ->first()?->verbatim_text;
-    }
-
-
-    /**
      * @param string $fileName
      * @param string|null $surveyId
      * @return $this
@@ -252,6 +235,13 @@ class DataService implements Arrayable
     }
 
     /**
+     * Load the verbatim file as answers of the survey's OPEN variables. Every
+     * open-end is its own variable (Q5_Other, Q5_97_Other), so a file row maps
+     * to one (interview, variable) by position/length and its code number is
+     * already implied by the parent question's closed answer. Rows that match
+     * no active OPEN variable are ignored: the question is optional and the
+     * file is not validated here.
+     *
      * @param string $fileName
      * @param string|null $surveyId
      * @return $this
@@ -265,7 +255,17 @@ class DataService implements Arrayable
 
         $content = $this->openFile($fileName, __FUNCTION__);
 
-        $result = [];
+        $variables = Variable::query()
+            ->active()
+            ->ofSurvey($surveyId)
+            ->where('type', VariableTypeEnum::OPEN)
+            ->get();
+
+        $byColumns = $variables->keyBy(fn (Variable $variable) => "{$variable->position}:{$variable->length}");
+        $byId      = $variables->keyBy('id');
+
+        // interview => variable id => code number => verbatim
+        $verbatims = [];
 
         while (!$content->eof()) {
 
@@ -273,13 +273,34 @@ class DataService implements Arrayable
 
                 $openAnswer = $this->parseOpenAnswerString($row);
 
-                $result[] = array_merge($openAnswer, [
-                    'survey_id'       => $surveyId,
-                ]);
+                $variable = $byColumns->get("{$openAnswer['position']}:{$openAnswer['length']}");
+
+                if ($variable === null) {
+                    continue;
+                }
+
+                $verbatims[$openAnswer['interview_number']][$variable->id][$openAnswer['code_number']] = $openAnswer['verbatim_text'];
             }
         }
 
-        $this->data = OpenAnswerData::collect($result, DataCollection::class);
+        $result = [];
+
+        foreach ($verbatims as $interviewNumber => $byVariable) {
+            foreach ($byVariable as $variableId => $byCode) {
+                // one row is the norm; several coded rows for one variable are
+                // kept apart by code number rather than overwriting each other
+                $data = count($byCode) === 1 ? reset($byCode) : collect($byCode)->sortKeys()->all();
+
+                $result[] = [
+                    'survey_id'        => $surveyId,
+                    'variable_id'      => $variableId,
+                    'interview_number' => $interviewNumber,
+                    'result'           => [$byId[$variableId]->slug => $data],
+                ];
+            }
+        }
+
+        $this->data = AnswerData::collect($result, DataCollection::class);
 
         return $this;
     }
@@ -347,15 +368,16 @@ class DataService implements Arrayable
      * Upsert the loaded rows. Rows carry (survey_id, interview_number); these
      * are resolved to a sample_id first, creating stub samples as needed, so
      * the open answer / paradata files can be loaded before the closed answers.
+     * Closed and open answers share the answers table but never the same
+     * (sample, variable) row, so either file can be reloaded on its own.
      *
      * @throws NoDataLoadedException
      */
     public function persist(): self
     {
         $dataModel = match ($this->getData()->getDataClass()) {
-            AnswerData::class     => config('survey.closed_answer_model'),
-            OpenAnswerData::class => config('survey.open_answer_model'),
-            ParadataData::class   => config('survey.paradata_model'),
+            AnswerData::class   => config('survey.closed_answer_model'),
+            ParadataData::class => config('survey.paradata_model'),
         };
 
         $rows = collect($this->getData()->toArray());

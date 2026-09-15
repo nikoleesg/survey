@@ -27,8 +27,6 @@ return [
 
     'variable_model' => \Nikoleesg\Survey\Models\Variable::class,
 
-    'open_answer_model' => \Nikoleesg\Survey\Models\OpenAnswer::class,
-
     'closed_answer_model' => \Nikoleesg\Survey\Models\Answer::class,
 
     'paradata_model' => \Nikoleesg\Survey\Models\Paradata::class,

@@ -64,6 +64,11 @@ it('returns null rather than an empty string for a missing open answer', functio
     Answer::query()->update(['result' => ['q4' => "  spaced \n out  "]]);
 
     expect($service->getAnswer(1, $variable->id)['answer'])->toBe('spaced out');
+
+    // several coded verbatims are squished one by one, keys kept
+    Answer::query()->update(['result' => ['q4' => [97 => "  one \n", 98 => ' two  ']]]);
+
+    expect($service->getAnswer(1, $variable->id)['answer'])->toBe([97 => 'one', 98 => 'two']);
 });
 
 it('returns null rather than now for an unanswered datetime', function () {

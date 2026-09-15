@@ -3,7 +3,6 @@
 use Nikoleesg\Survey\Enums\ParadataLabelEnum;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
 use Nikoleesg\Survey\Models\Answer;
-use Nikoleesg\Survey\Models\OpenAnswer;
 use Nikoleesg\Survey\Models\Paradata;
 use Nikoleesg\Survey\Models\Sample;
 use Nikoleesg\Survey\Models\Variable;
@@ -61,19 +60,17 @@ it('casts variable columns', function () {
         ->and($variable->getData()->options)->toBe(['rows' => 3]);
 });
 
-it('relates sample to answers, open answers and paradata', function () {
+it('relates sample to answers and paradata', function () {
     $sample = Sample::create(['interview_number' => 7]);
     $other = Sample::create(['interview_number' => 8]);
     $variable = Variable::create(['name' => 'Q1', 'type' => VariableTypeEnum::SINGLE]);
 
     Answer::create(['sample_id' => $sample->id, 'variable_id' => $variable->id, 'result' => ['q1' => 3]]);
     Answer::create(['sample_id' => $other->id, 'variable_id' => $variable->id, 'result' => ['q1' => 4]]);
-    OpenAnswer::create(['sample_id' => $sample->id, 'position' => 10, 'length' => 5, 'verbatim_text' => 'hi']);
     Paradata::create(['sample_id' => $sample->id, 'label' => 'DeviceId', 'result' => 'abc']);
 
     expect($sample->answers)->toHaveCount(1)
         ->and($sample->getAnswers())->toBe(['q1' => 3])
-        ->and($sample->openAnswers)->toHaveCount(1)
         ->and($sample->paradata)->toHaveCount(1)
         ->and($sample->paradataOf(ParadataLabelEnum::DEVICE_ID)->first()->result)->toBe('abc')
         ->and($sample->paradataOf('DeviceId')->first()->result)->toBe('abc')

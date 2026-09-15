@@ -21,8 +21,6 @@ class AnswerService
 
     protected string $closedAnswerModel;
 
-    protected string $openAnswerModel;
-
     protected string $paradataAnswerModel;
 
     public function __construct(?string $surveyId = null, int|array|null $interviewId = null)
@@ -36,8 +34,6 @@ class AnswerService
         }
 
         $this->closedAnswerModel = config('survey.closed_answer_model');
-
-        $this->openAnswerModel = config('survey.open_answer_model');
 
         $this->paradataAnswerModel = config('survey.paradata_model');
     }
@@ -140,7 +136,12 @@ class AnswerService
                 switch ($item->variable->type) {
                     case VariableTypeEnum::OPEN:
                     case VariableTypeEnum::ALPHA:
-                        $answer = $result === null ? null : Str::squish($result);
+                        // an open answer keyed by code number is squished per entry
+                        $answer = match (true) {
+                            $result === null  => null,
+                            is_array($result) => array_map(Str::squish(...), $result),
+                            default           => Str::squish($result),
+                        };
                         break;
                     case VariableTypeEnum::DATETIME:
                         $answer = $result === null ? null : Carbon::parse($result, 'Asia/Singapore');

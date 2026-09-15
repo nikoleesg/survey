@@ -1,7 +1,6 @@
 <?php
 
 use Nikoleesg\Survey\Data\AnswerData;
-use Nikoleesg\Survey\Data\OpenAnswerData;
 use Nikoleesg\Survey\Data\ParadataData;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
 use Nikoleesg\Survey\Exceptions\MissingSurveyIdException;
@@ -11,7 +10,6 @@ use Nikoleesg\Survey\Exceptions\UnparseableColumnException;
 use Nikoleesg\Survey\Exceptions\UnreadableFileException;
 use Nikoleesg\Survey\Services\AnswerService;
 use Nikoleesg\Survey\Models\Answer;
-use Nikoleesg\Survey\Models\OpenAnswer;
 use Nikoleesg\Survey\Models\Paradata;
 use Nikoleesg\Survey\Models\Sample;
 use Nikoleesg\Survey\Models\Variable;
@@ -26,35 +24,66 @@ function writeFixture(string $content): string
     return $path;
 }
 
-it('loads open answers from file into a DataCollection', function () {
+it('loads open answers from file as answers of the matching OPEN variables', function () {
+    $q4 = Variable::create(['survey_id' => 'survey-a', 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 10, 'length' => 5]);
+    $q5Other = Variable::create(['survey_id' => 'survey-a', 'name' => 'Q5_97_Other', 'type' => VariableTypeEnum::OPEN, 'position' => 20, 'length' => 5]);
+    // same columns, other survey: must not match
+    Variable::create(['survey_id' => 'survey-b', 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 10, 'length' => 5]);
+
     $file = writeFixture(
         "000000010100010005 Hello world\n".
-        "0000000201000200501 Second answer\n"
+        "00000002010002000597 Second answer\n".
+        // interview 2 skipped Q4 (optional); no row for it
+        "000000030100099005 no variable at these columns\n"
     );
 
     $data = (new DataService())->getOpenAnswersFromFile($file, 'survey-a')->getData();
 
     expect($data)->toBeInstanceOf(DataCollection::class)
-        ->and($data->getDataClass())->toBe(OpenAnswerData::class)
+        ->and($data->getDataClass())->toBe(AnswerData::class)
         ->and($data)->toHaveCount(2);
 
-    $first = $data->toArray()[0];
-    expect($first)->toMatchArray([
-        'interview_number'         => 1,
-        'sub_questionnaire_number' => 1,
-        'position'                 => 10,
-        'length'                   => 5,
-        'code_number'              => 0,
-        'verbatim_text'            => 'Hello world',
-        'survey_id'                => 'survey-a',
+    $rows = $data->toArray();
+
+    expect($rows[0])->toMatchArray([
+        'survey_id'        => 'survey-a',
+        'variable_id'      => $q4->id,
+        'interview_number' => 1,
+        'result'           => json_encode(['q4' => 'Hello world']),
     ]);
 
-    expect($data->toArray()[1])->toMatchArray([
+    // the code number is implied by Q5's closed answer; only the text is kept
+    expect($rows[1])->toMatchArray([
+        'variable_id'      => $q5Other->id,
         'interview_number' => 2,
-        'position'         => 20,
-        'code_number'      => 1,
-        'verbatim_text'    => 'Second answer',
+        'result'           => json_encode(['q5_97_other' => 'Second answer']),
     ]);
+
+    unlink($file);
+});
+
+it('keys several coded open answers of one variable by code number', function () {
+    Variable::create(['survey_id' => 'survey-a', 'name' => 'Q5_Other', 'type' => VariableTypeEnum::OPEN, 'position' => 20, 'length' => 5]);
+
+    $file = writeFixture(
+        "00000001010002000598 Other two\n".
+        "00000001010002000597 Other one\n"
+    );
+
+    $rows = (new DataService())->getOpenAnswersFromFile($file, 'survey-a')->getData()->toArray();
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['result'])->toBe(json_encode(['q5_other' => [97 => 'Other one', 98 => 'Other two']]));
+
+    unlink($file);
+});
+
+it('ignores inactive OPEN variables when loading open answers', function () {
+    Variable::create(['survey_id' => 'survey-a', 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 10, 'length' => 5, 'is_active' => false]);
+
+    $file = writeFixture("000000010100010005 Hello world\n");
+
+    expect((new DataService())->getOpenAnswersFromFile($file, 'survey-a')->getData())->toHaveCount(0);
 
     unlink($file);
 });
@@ -92,16 +121,8 @@ it('loads closed answers from file into a DataCollection', function () {
     $single = Variable::create(['survey_id' => $surveyId, 'name' => 'Q1', 'type' => VariableTypeEnum::SINGLE, 'position' => 41, 'length' => 1, 'fraction' => 0]);
     $multi = Variable::create(['survey_id' => $surveyId, 'name' => 'Q2', 'type' => VariableTypeEnum::MULTIPLE, 'position' => 42, 'length' => 3, 'fraction' => 0]);
     $numeric = Variable::create(['survey_id' => $surveyId, 'name' => 'Q3', 'type' => VariableTypeEnum::NUMERICAL, 'position' => 45, 'length' => 3, 'fraction' => 2]);
-    $open = Variable::create(['survey_id' => $surveyId, 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 50, 'length' => 5, 'fraction' => 0]);
-
-    $sample = Sample::create(['survey_id' => $surveyId, 'interview_number' => 1]);
-
-    OpenAnswer::create([
-        'sample_id'     => $sample->id,
-        'position'      => 50,
-        'length'        => 5,
-        'verbatim_text' => 'Free text',
-    ]);
+    // OPEN is loaded from the verbatim file, never from this one
+    Variable::create(['survey_id' => $surveyId, 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 50, 'length' => 5, 'fraction' => 0]);
 
     // cols 1-8 interview, 9-10 sub-q, 11-15 seconds, 16-19 screens, 21-28 interviewer, 29-40 datetime, then variables
     $row = '00000001' . '01' . '00120' . '0005' . ' ' . 'INT00001' . '202401151030' . '3' . '101' . '12345' . '     ';
@@ -111,7 +132,7 @@ it('loads closed answers from file into a DataCollection', function () {
 
     expect($data)->toBeInstanceOf(DataCollection::class)
         ->and($data->getDataClass())->toBe(AnswerData::class)
-        ->and($data)->toHaveCount(4);
+        ->and($data)->toHaveCount(3);
 
     $byVariable = collect($data->toArray())->keyBy('variable_id');
 
@@ -122,7 +143,6 @@ it('loads closed answers from file into a DataCollection', function () {
     ]);
     expect($byVariable[$multi->id]['result'])->toBe(json_encode(['q2' => [1, 0, 1]]));
     expect($byVariable[$numeric->id]['result'])->toBe(json_encode(['q3' => 123.45]));
-    expect($byVariable[$open->id]['result'])->toBe(json_encode(['q4' => 'Free text']));
 
     unlink($file);
 });
@@ -244,33 +264,81 @@ it('exposes every package exception under a common base', function () {
 });
 
 it('persists open answers, creating stub samples and upserting on re-run', function () {
+    $q4 = Variable::create(['survey_id' => 'survey-a', 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 10, 'length' => 5]);
+    Variable::create(['survey_id' => 'survey-a', 'name' => 'Q5_Other', 'type' => VariableTypeEnum::OPEN, 'position' => 20, 'length' => 5]);
+
     $file = writeFixture(
         "000000010100010005 Hello world\n".
-        "0000000201000200501 Second answer\n"
+        "00000002010002000597 Second answer\n"
     );
 
     $service = (new DataService())->getOpenAnswersFromFile($file, 'survey-a')->persist();
 
     expect(Sample::ofSurvey('survey-a')->count())->toBe(2)
-        ->and(OpenAnswer::count())->toBe(2);
+        ->and(Answer::count())->toBe(2);
 
     $sample = Sample::ofSurvey('survey-a')->where('interview_number', 1)->first();
-    $row = OpenAnswer::where('sample_id', $sample->id)->first();
+    $row = Answer::where('sample_id', $sample->id)->first();
 
-    expect($row)->toMatchArray([
-        'position'      => 10,
-        'length'        => 5,
-        'code_number'   => 0,
-        'verbatim_text' => 'Hello world',
-    ]);
+    expect($row->variable_id)->toBe($q4->id)
+        ->and($row->result)->toBe(['q4' => 'Hello world']);
 
     // re-persist with changed text: same rows, updated verbatim
-    file_put_contents($file, "000000010100010005 Hello again\n0000000201000200501 Second answer\n");
+    file_put_contents($file, "000000010100010005 Hello again\n00000002010002000597 Second answer\n");
     $service->getOpenAnswersFromFile($file, 'survey-a')->persist();
 
     expect(Sample::count())->toBe(2)
-        ->and(OpenAnswer::count())->toBe(2)
-        ->and($row->fresh()->verbatim_text)->toBe('Hello again');
+        ->and(Answer::count())->toBe(2)
+        ->and($row->fresh()->result)->toBe(['q4' => 'Hello again']);
+
+    unlink($file);
+});
+
+it('loads closed and open answer files in either order without one wiping the other', function () {
+    $surveyId = 'survey-a';
+    Variable::create(['survey_id' => $surveyId, 'name' => 'Q1', 'type' => VariableTypeEnum::SINGLE, 'position' => 41, 'length' => 1, 'fraction' => 0]);
+    Variable::create(['survey_id' => $surveyId, 'name' => 'Q1_Other', 'type' => VariableTypeEnum::OPEN, 'position' => 42, 'length' => 5, 'fraction' => 0]);
+
+    $closed = writeFixture('00000001' . '01' . '00120' . '0005' . ' ' . 'INT00001' . '202401151030' . '7' . '     ' . "\n");
+    $open   = writeFixture("000000010100042005 Free text\n");
+
+    $service = (new DataService())->setSurvey($surveyId);
+
+    $service->getOpenAnswersFromFile($open)->persist();
+    $service->getClosedAnswersFromFile($closed)->persist();
+
+    $sample = Sample::ofSurvey($surveyId)->where('interview_number', 1)->first();
+
+    expect(Answer::count())->toBe(2)
+        ->and($sample->getAnswers())->toBe(['q1' => 7, 'q1_other' => 'Free text']);
+
+    // and the other way round
+    $service->getClosedAnswersFromFile($closed)->persist();
+    $service->getOpenAnswersFromFile($open)->persist();
+
+    expect(Answer::count())->toBe(2)
+        ->and($sample->fresh()->getAnswers())->toBe(['q1' => 7, 'q1_other' => 'Free text']);
+
+    expect((new AnswerService($surveyId))->getAnswers()[1]->pluck('answer', 'variable_name')->all())
+        ->toEqualCanonicalizing(['Q1' => 7, 'Q1_Other' => 'Free text']);
+
+    unlink($closed);
+    unlink($open);
+});
+
+it('runs a fixed number of queries when loading closed answers, regardless of rows', function () {
+    $surveyId = 'survey-a';
+    Variable::create(['survey_id' => $surveyId, 'name' => 'Q1', 'type' => VariableTypeEnum::SINGLE, 'position' => 41, 'length' => 1, 'fraction' => 0]);
+    Variable::create(['survey_id' => $surveyId, 'name' => 'Q1_Other', 'type' => VariableTypeEnum::OPEN, 'position' => 42, 'length' => 5, 'fraction' => 0]);
+
+    $header = fn (string $interview) => $interview . '01' . '00120' . '0005' . ' ' . 'INT00001' . '202401151030';
+    $file = writeFixture(implode('', array_map(fn ($i) => $header(sprintf('%08d', $i)) . "1     \n", range(1, 50))));
+
+    \Illuminate\Support\Facades\DB::enableQueryLog();
+    (new DataService())->getClosedAnswersFromFile($file, $surveyId);
+
+    // one query: the survey's variables
+    expect(\Illuminate\Support\Facades\DB::getQueryLog())->toHaveCount(1);
 
     unlink($file);
 });
