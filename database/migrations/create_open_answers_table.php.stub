@@ -13,17 +13,16 @@ return new class extends Migration
     {
         Schema::create(config('survey.table_prefix').'open_answers', function (Blueprint $table) {
             $table->id();
-
-            $table->string('survey_id');
-            $table->unsignedBigInteger('interview_number');
-            $table->unsignedTinyInteger('sub_questionnaire_number');
+            $table->foreignId('sample_id')->constrained(config('survey.table_prefix').'samples')->cascadeOnDelete();
+            $table->unsignedTinyInteger('sub_questionnaire_number')->nullable();
             $table->unsignedMediumInteger('position');
             $table->unsignedSmallInteger('length');
-            $table->unsignedSmallInteger('code_number')->nullable();
+            // NOT NULL so it can take part in the unique key (NULLs never collide)
+            $table->unsignedSmallInteger('code_number')->default(0);
             $table->mediumText('verbatim_text');
             $table->timestamps();
 
-            $table->unique(['survey_id', 'interview_number', 'position', 'length', 'code_number'], 'unique_open_answers');
+            $table->unique(['sample_id', 'position', 'length', 'code_number'], 'unique_open_answers');
         });
     }
 

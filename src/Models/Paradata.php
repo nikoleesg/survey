@@ -4,23 +4,16 @@ namespace Nikoleesg\Survey\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Nikoleesg\Survey\Traits\BelongsToSample;
 use Nikoleesg\Survey\Traits\HasTablePrefix;
 
 class Paradata extends Model
 {
-    use HasTablePrefix;
+    use HasTablePrefix, BelongsToSample;
 
     protected $guarded = [];
 
-    public function scopeOfSurvey(Builder $query, string $surveyId): void
-    {
-        $query->where('survey_id', $surveyId);
-    }
-
-    public function scopeOfSample(Builder $query, int $interviewNumber): void
-    {
-        $query->where('interview_number', $interviewNumber);
-    }
+    public const UPSERT_KEYS = ['sample_id', 'label'];
 
     public function scopeOfLabel(Builder $query, string $label): void
     {

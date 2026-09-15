@@ -20,15 +20,23 @@ use Nikoleesg\Survey\Data\AnswerData;
 
 class DataService implements Arrayable
 {
-    protected string $surveyId;
+    protected ?string $surveyId = null;
 
     protected DataCollection $data;
 
-    public function setSurvey(string $surveyId): self
+    public function setSurvey(?string $surveyId): self
     {
         $this->surveyId = $surveyId;
 
         return $this;
+    }
+
+    /**
+     * Explicit argument, then setSurvey(), then the configured default.
+     */
+    protected function resolveSurveyId(?string $surveyId): string
+    {
+        return $surveyId ?? $this->surveyId ?? config('survey.survey_id');
     }
 
     /**
@@ -38,19 +46,11 @@ class DataService implements Arrayable
      */
     public function getClosedAnswersFromFile(string $fileName, ?string $surveyId = null): self
     {
-        $surveyId = $surveyId ?? $this->surveyId ?? null;
-
-        if ($surveyId === null) {
-            // throw exception
-            return $this;
-        }
+        $surveyId = $this->resolveSurveyId($surveyId);
 
         $content = new SplFileObject($fileName);
 
         $result = [];
-
-        // get Survey Id
-        $surveyId = $this->surveyId;
 
         // get Variables of survey (active)
         $variables = Variable::query()->active()->ofSurvey($surveyId)->get();
@@ -104,20 +104,15 @@ class DataService implements Arrayable
                 VariableTypeEnum::OPEN => $this->getVerbatimText($surveyId, $interviewNumber, $startPosition, $length),
                 VariableTypeEnum::ALPHA => $contentOfColumns,
                 VariableTypeEnum::CALCULABLE => null,
+                VariableTypeEnum::MATRIX => null, // TODO: matrix answers
                 VariableTypeEnum::DUMMY => null,
                 VariableTypeEnum::DATETIME => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateTimeString(),
                 VariableTypeEnum::DATE => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateString(),
                 VariableTypeEnum::TIME => Carbon::createFromFormat('Hi', $contentOfColumns)->toTimeString(),
             };
 
-            $result = [];
-
-            foreach (!is_array($data) ? [$data] : $data as $key => $value) {
-                // add result, variable name as key, answer as value
-                $variable_name = $variable->type === VariableTypeEnum::MULTIPLE ? $variable->slug . '_' . $key + 1 : $variable->slug;
-
-                $result = Arr::add($result, $variable_name, $value);
-            }
+            // answer keyed by variable slug; MULTIPLE is a list of 0/1 per code
+            $result = [$variable->slug => $data];
 
             $answerData = [
                 'survey_id'        => $surveyId,
@@ -141,12 +136,13 @@ class DataService implements Arrayable
      */
     protected function getVerbatimText(string $surveyId, string $interviewNumber, int $position, int $length): ?string
     {
-        return OpenAnswer::query()->where([
-            'survey_id'        => $surveyId,
-            'interview_number' => $interviewNumber,
-            'position'         => $position,
-            'length'           => $length
-        ])->first()?->verbatim_text;
+        return OpenAnswer::query()
+            ->whereHas('sample', fn ($query) => $query
+                ->ofSurvey($surveyId)
+                ->where('interview_number', $interviewNumber))
+            ->where('position', $position)
+            ->where('length', $length)
+            ->first()?->verbatim_text;
     }
 
 
@@ -157,12 +153,7 @@ class DataService implements Arrayable
      */
     public function getParadatafromFile(string $fileName, ?string $surveyId = null): self
     {
-        $surveyId = $surveyId ?? $this->surveyId ?? null;
-
-        if ($surveyId === null) {
-            // throw exception
-            return $this;
-        }
+        $surveyId = $this->resolveSurveyId($surveyId);
 
         $csvContent = $this->getCsvFileContent($fileName);
 
@@ -206,12 +197,7 @@ class DataService implements Arrayable
      */
     public function getOpenAnswersFromFile(string $fileName, ?string $surveyId = null): self
     {
-        $surveyId = $surveyId ?? $this->surveyId ?? null;
-
-        if ($surveyId === null) {
-            // throw exception
-            return $this;
-        }
+        $surveyId = $this->resolveSurveyId($surveyId);
 
         $content = new SplFileObject($fileName);
 

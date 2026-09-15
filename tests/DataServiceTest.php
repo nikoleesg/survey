@@ -5,6 +5,7 @@ use Nikoleesg\Survey\Data\OpenAnswerData;
 use Nikoleesg\Survey\Data\ParadataData;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
 use Nikoleesg\Survey\Models\OpenAnswer;
+use Nikoleesg\Survey\Models\Sample;
 use Nikoleesg\Survey\Models\Variable;
 use Nikoleesg\Survey\Services\DataService;
 use Spatie\LaravelData\DataCollection;
@@ -85,13 +86,13 @@ it('loads closed answers from file into a DataCollection', function () {
     $numeric = Variable::create(['survey_id' => $surveyId, 'name' => 'Q3', 'type' => VariableTypeEnum::NUMERICAL, 'position' => 45, 'length' => 3, 'fraction' => 2]);
     $open = Variable::create(['survey_id' => $surveyId, 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 50, 'length' => 5, 'fraction' => 0]);
 
+    $sample = Sample::create(['survey_id' => $surveyId, 'interview_number' => 1]);
+
     OpenAnswer::create([
-        'survey_id'                => $surveyId,
-        'interview_number'         => 1,
-        'sub_questionnaire_number' => 1,
-        'position'                 => 50,
-        'length'                   => 5,
-        'verbatim_text'            => 'Free text',
+        'sample_id'     => $sample->id,
+        'position'      => 50,
+        'length'        => 5,
+        'verbatim_text' => 'Free text',
     ]);
 
     // cols 1-8 interview, 9-10 sub-q, 11-15 seconds, 16-19 screens, 21-28 interviewer, 29-40 datetime, then variables
@@ -111,7 +112,7 @@ it('loads closed answers from file into a DataCollection', function () {
         'interview_number' => 1,
         'result'           => json_encode(['q1' => 3]),
     ]);
-    expect($byVariable[$multi->id]['result'])->toBe(json_encode(['q2_1' => 1, 'q2_2' => 0, 'q2_3' => 1]));
+    expect($byVariable[$multi->id]['result'])->toBe(json_encode(['q2' => [1, 0, 1]]));
     expect($byVariable[$numeric->id]['result'])->toBe(json_encode(['q3' => 123.45]));
     expect($byVariable[$open->id]['result'])->toBe(json_encode(['q4' => 'Free text']));
 

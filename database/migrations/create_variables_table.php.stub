@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create(config('survey.table_prefix').'variables', function (Blueprint $table) {
             $table->id();
-            $table->uuid('uuid');
+            $table->uuid('uuid')->unique();
             $table->string('survey_id');
 
             $table->string('name');
@@ -21,19 +21,21 @@ return new class extends Migration
             $table->string('label')->nullable();
 
             $table->unsignedTinyInteger('type');
-            $table->text('codes')->nullable();
-            $table->text('attributes')->nullable();
+            $table->json('codes')->nullable();
+            $table->json('options')->nullable();
             $table->unsignedInteger('position')->nullable();
             $table->unsignedInteger('length')->nullable();
             $table->unsignedInteger('fraction')->nullable();
-            $table->text('formula')->nullable();
+            $table->json('formula')->nullable();
 
             $table->text('remark')->nullable();
             $table->boolean('is_dynamic')->default(false);
-            $table->boolean('status')->default(true);
+            $table->boolean('is_active')->default(true);
             $table->unsignedInteger('order_column')->nullable();
 
             $table->timestamps();
+
+            $table->unique(['survey_id', 'slug']);
         });
     }
 

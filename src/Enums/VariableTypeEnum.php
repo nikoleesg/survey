@@ -34,21 +34,15 @@ enum VariableTypeEnum: int
         };
     }
 
+    /**
+     * @return array<int, string> value => label
+     */
     public static function labels(): array
     {
-        return [
-            1 => 'Single',
-            2 => 'Multiple',
-            3 => 'Numerical',
-            4 => 'Open',
-            5 => 'Text',
-            6 => 'Calculation',
-            7 => 'Matrix',
-            9 => 'Dummy',
-            11 => 'Datetime',
-            12 => 'Date',
-            13 => 'Time',
-        ];
-
+        return array_column(
+            array_map(fn (self $case) => [$case->value, $case->label()], self::cases()),
+            1,
+            0
+        );
     }
 }

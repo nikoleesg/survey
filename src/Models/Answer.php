@@ -2,19 +2,17 @@
 
 namespace Nikoleesg\Survey\Models;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Spatie\LaravelData\WithData;
-use Awobaz\Compoships\Compoships;
+use Nikoleesg\Survey\Traits\BelongsToSample;
 use Nikoleesg\Survey\Traits\HasTablePrefix;
 use Nikoleesg\Survey\Data\AnswerData;
 
 class Answer extends Model
 {
-    use HasTablePrefix;
-    use WithData, Compoships;
+    use HasTablePrefix, BelongsToSample;
+    use WithData;
 
     protected $guarded = [];
 
@@ -24,13 +22,10 @@ class Answer extends Model
         'result' => 'array',
     ];
 
+    public const UPSERT_KEYS = ['sample_id', 'variable_id'];
+
     public function variable(): BelongsTo
     {
-        return $this->belongsTo(Variable::class);
-    }
-
-    public function sample(): MorphTo
-    {
-        return $this->morphTo();
+        return $this->belongsTo(config('survey.variable_model'), 'variable_id');
     }
 }

@@ -14,7 +14,7 @@ use Nikoleesg\Survey\Enums\VariableTypeEnum;
 
 class AnswerService
 {
-    protected string $surveyId;
+    protected ?string $surveyId = null;
 
     protected array|null $interviewId;
 
@@ -41,11 +41,16 @@ class AnswerService
         $this->paradataAnswerModel = config('survey.paradata_model');
     }
 
-    public function setSurvey(string $surveyId): self
+    public function setSurvey(?string $surveyId): self
     {
         $this->surveyId = $surveyId;
 
         return $this;
+    }
+
+    protected function resolveSurveyId(): string
+    {
+        return $this->surveyId ?? config('survey.survey_id');
     }
 
     public function setInterview(int|array $interviewId): self
@@ -63,15 +68,13 @@ class AnswerService
 
     public function getAnswers(int|array|null $filteredInterview = null, array|EloquentCollection|null $filteredVariable = null)
     {
-        if (is_null($this->surveyId)) {
-            // TODO: exception
-        }
+        $surveyId = $this->resolveSurveyId();
 
         // prepare variables collection
         if ($filteredVariable instanceof EloquentCollection) {
             $variables = $filteredVariable;
         } else {
-            $variableQuery = Variable::query();
+            $variableQuery = Variable::query()->ofSurvey($surveyId);
 
             $variableQuery->when($this->isIntegerList($filteredVariable), function (Builder $query) use ($filteredVariable) {
                 return $query->whereIn('id', $filteredVariable);
@@ -86,10 +89,11 @@ class AnswerService
         }
 
         // query
-        $builder = app($this->closedAnswerModel)->query()->with('variable');
+        $builder = app($this->closedAnswerModel)->query()->with(['variable', 'sample']);
 
-        $builder->when(isset($this->interviewId), function (Builder $query) {
-            return $query->whereIn('interview_number', $this->interviewId);
+        $builder->whereHas('sample', function (Builder $query) use ($surveyId) {
+            $query->ofSurvey($surveyId)
+                ->when(isset($this->interviewId), fn (Builder $q) => $q->whereIn('interview_number', $this->interviewId));
         });
 
         return $builder
@@ -97,6 +101,7 @@ class AnswerService
             ->get()
             ->map(function ($item) {
 
+                $item['interview_number'] = $item->sample->interview_number;
                 $item['variable_id']   = $item->variable->id;
                 $item['variable_name'] = $item->variable->name;
                 $item['variable_type'] = $item->variable->type;

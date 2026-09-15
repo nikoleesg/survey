@@ -2,23 +2,17 @@
 
 namespace Nikoleesg\Survey\Traits;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Nikoleesg\Survey\Models\Answer;
-use Awobaz\Compoships\Compoships;
 
 trait HasAnswers
 {
-    use Compoships;
-
     public function answers(): HasMany
     {
-        return $this->hasMany(Answer::class, ['interview_number', 'survey_id'], ['interview_id', 'survey_id']);
+        return $this->hasMany(config('survey.closed_answer_model'), 'sample_id');
     }
 
     /**
-     * get survey sample answers
-     * @return array
+     * All of the sample's answers merged into one array keyed by variable slug.
      */
     public function getAnswers(): array
     {
@@ -28,10 +22,11 @@ trait HasAnswers
 
         $answerRelation->pluck('result')
             ->each(function ($item) use (&$answers) {
-                $answers = array_merge($answers, $item);
+                if (is_array($item)) {
+                    $answers = array_merge($answers, $item);
+                }
             });
 
         return $answers;
     }
-
 }

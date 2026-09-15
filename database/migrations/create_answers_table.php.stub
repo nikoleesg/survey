@@ -13,13 +13,12 @@ return new class extends Migration
     {
         Schema::create(config('survey.table_prefix').'answers', function (Blueprint $table) {
             $table->id();
-            $table->string('survey_id');
-            $table->unsignedBigInteger('variable_id');
-            $table->unsignedBigInteger('interview_number');
-            $table->mediumText('result');
+            $table->foreignId('sample_id')->constrained(config('survey.table_prefix').'samples')->cascadeOnDelete();
+            $table->foreignId('variable_id')->constrained(config('survey.table_prefix').'variables')->cascadeOnDelete();
+            $table->json('result');
             $table->timestamps();
 
-            $table->unique(['survey_id', 'variable_id', 'interview_number']);
+            $table->unique(['sample_id', 'variable_id']);
         });
     }
 
