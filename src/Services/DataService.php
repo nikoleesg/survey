@@ -15,7 +15,7 @@ use Carbon\Exceptions\InvalidFormatException;
 use Nikoleesg\Survey\Models\Variable;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
 use Nikoleesg\Survey\Data\ParadataData;
-use Nikoleesg\Survey\Data\ClosedAnswerData;
+use Nikoleesg\Survey\Data\SampleData;
 use Nikoleesg\Survey\Data\AnswerData;
 use Nikoleesg\Survey\Exceptions\MissingSurveyIdException;
 use Nikoleesg\Survey\Exceptions\NoDataLoadedException;
@@ -27,6 +27,12 @@ class DataService implements Arrayable
     protected ?string $surveyId = null;
 
     protected DataCollection $data;
+
+    /**
+     * The interview headers of the last closed answer file loaded, one
+     * SampleData per record; null after any other loader.
+     */
+    protected ?DataCollection $samples = null;
 
     public function setSurvey(?string $surveyId): self
     {
@@ -78,7 +84,8 @@ class DataService implements Arrayable
 
         $content = $this->openFile($fileName, __FUNCTION__);
 
-        $result = [];
+        $result  = [];
+        $samples = [];
 
         // OPEN variables are owned by getOpenAnswersFromFile(); emitting a
         // row for them here would let a later closed load wipe the verbatim
@@ -96,13 +103,14 @@ class DataService implements Arrayable
                 // shift every fixed-width column after it
                 $string = rtrim($row, "\r\n");
 
-                // parse closed answer of system variables
-                $closedAnswer = ClosedAnswerData::from($string);
+                // columns 1-60 are the system header: the sample row
+                $sample = SampleData::fromRow($surveyId, $string);
 
-                // Parse answers of variables...
-                $interviewNumber = $closedAnswer->interview_number;
+                // a repeated interview number keeps the last record, as the
+                // upsert would
+                $samples[$sample->interview_number] = $sample;
 
-                $variableAnswers = $this->getVariableAnswers($surveyId, $interviewNumber, $variables, $string);
+                $variableAnswers = $this->getVariableAnswers($surveyId, $sample->interview_number, $variables, $string);
 
                 // append sample's answer to result
                 foreach ($variableAnswers as $variableAnswer) {
@@ -111,7 +119,8 @@ class DataService implements Arrayable
             }
         }
 
-        $this->data = AnswerData::collect($result, DataCollection::class);
+        $this->data    = AnswerData::collect($result, DataCollection::class);
+        $this->samples = SampleData::collect(array_values($samples), DataCollection::class);
 
         return $this;
     }
@@ -231,7 +240,8 @@ class DataService implements Arrayable
             }
         }
 
-        $this->data = ParadataData::collect($result, DataCollection::class);
+        $this->data    = ParadataData::collect($result, DataCollection::class);
+        $this->samples = null;
 
         return $this;
     }
@@ -303,7 +313,8 @@ class DataService implements Arrayable
             }
         }
 
-        $this->data = AnswerData::collect($result, DataCollection::class);
+        $this->data    = AnswerData::collect($result, DataCollection::class);
+        $this->samples = null;
 
         return $this;
     }
@@ -376,8 +387,10 @@ class DataService implements Arrayable
      * Upsert the loaded rows. Rows carry (survey_id, interview_number); these
      * are resolved to a sample_id first, creating stub samples as needed, so
      * the open answer / paradata files can be loaded before the closed answers.
-     * Closed and open answers share the answers table but never the same
-     * (sample, variable) row, so either file can be reloaded on its own.
+     * The closed answer file also carries the interview header, which is
+     * upserted onto the samples first, so it fills in stubs and refreshes on
+     * reload. Closed and open answers share the answers table but never the
+     * same (sample, variable) row, so either file can be reloaded on its own.
      *
      * @throws NoDataLoadedException
      */
@@ -387,6 +400,8 @@ class DataService implements Arrayable
             AnswerData::class   => config('survey.closed_answer_model'),
             ParadataData::class => config('survey.paradata_model'),
         };
+
+        $this->persistSamples();
 
         $rows = collect($this->getData()->toArray());
 
@@ -409,6 +424,28 @@ class DataService implements Arrayable
         }
 
         return $this;
+    }
+
+    /**
+     * Upsert the interview headers of a loaded closed answer file onto the
+     * samples table; a no-op after the other loaders.
+     */
+    protected function persistSamples(): void
+    {
+        $rows = collect($this->getSamples()->toArray());
+
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        $sampleModel = config('survey.sample_model');
+
+        $uniqueBy   = $sampleModel::UPSERT_KEYS;
+        $updateKeys = array_values(array_diff(array_keys($rows->first()), $uniqueBy));
+
+        foreach ($rows->chunk(config('survey.persist_chunk_size')) as $chunk) {
+            $sampleModel::upsert($chunk->values()->all(), $uniqueBy, $updateKeys);
+        }
     }
 
     /**
@@ -470,6 +507,15 @@ class DataService implements Arrayable
         }
 
         return $this->data;
+    }
+
+    /**
+     * The interview headers parsed by the last getClosedAnswersFromFile();
+     * empty when the last load was another file.
+     */
+    public function getSamples(): DataCollection
+    {
+        return $this->samples ?? SampleData::collect([], DataCollection::class);
     }
 
     public function toArray(): array

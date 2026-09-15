@@ -46,14 +46,22 @@ return new class extends Migration
             $table->string('survey_id');
             $table->unsignedBigInteger('interview_number');
 
-            // interview-level fields from the closed answer file header;
+            // the system header of the closed answer file (columns 1-60);
             // nullable because a sample may be created as a stub from the
             // open answer / paradata files before the closed answers are loaded
             $table->unsignedTinyInteger('sub_questionnaire_number')->nullable();
-            $table->string('interviewer_id')->nullable();
             $table->unsignedInteger('interview_time_in_seconds')->nullable();
             $table->unsignedSmallInteger('number_of_screens_shown')->nullable();
+            $table->unsignedTinyInteger('interrupt_indication')->nullable();
+            $table->string('interviewer_id')->nullable();
             $table->dateTime('last_contact_at')->nullable();
+            $table->string('odin_version')->nullable();
+            $table->unsignedInteger('idle_time')->nullable();
+            // CASI only
+            $table->unsignedTinyInteger('week_number')->nullable();
+            $table->unsignedTinyInteger('week_version_number')->nullable();
+            $table->unsignedTinyInteger('family_member_number')->nullable();
+            $table->unsignedTinyInteger('channel')->nullable();
 
             $table->timestamps();
 

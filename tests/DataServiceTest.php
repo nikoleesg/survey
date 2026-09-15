@@ -2,6 +2,9 @@
 
 use Nikoleesg\Survey\Data\AnswerData;
 use Nikoleesg\Survey\Data\ParadataData;
+use Nikoleesg\Survey\Data\SampleData;
+use Nikoleesg\Survey\Enums\ChannelEnum;
+use Nikoleesg\Survey\Enums\InterruptIndicationEnum;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
 use Nikoleesg\Survey\Exceptions\MissingSurveyIdException;
 use Nikoleesg\Survey\Exceptions\NoDataLoadedException;
@@ -238,7 +241,8 @@ it('prefers an explicit survey id over setSurvey() when loading closed answers',
     unlink($file);
 });
 
-// 40-column system header; variable columns start at position 41
+// the first 40 header columns; real files reserve 60 but variable positions
+// are absolute, so these fixtures put the variables straight after
 function closedAnswerRow(string $variables, string $interview = '00000001'): string
 {
     return $interview . '01' . '00120' . '0005' . ' ' . 'INT00001' . '202401151030' . $variables . "\n";
@@ -448,6 +452,114 @@ it('persists paradata against an existing sample', function () {
         ->and($sample->paradataOf('Device')->first()->result)->toBe('Phone');
 
     unlink($file);
+});
+
+// the full 60-column system header of the closed answer file
+function closedAnswerHeader(string $interview = '00000001', string $interrupt = ' ', string $channel = '2'): string
+{
+    return $interview . '01' . '00120' . '0005' . $interrupt . 'INT00001' . '202401151030'
+        . '0' . '6.1.2.0' . '00042' . '07' . '03' . '02' . $channel;
+}
+
+it('parses the 60-column system header of a closed answer record into a SampleData', function () {
+    $file = writeFixture(closedAnswerHeader(interrupt: '1') . "7\n");
+
+    $samples = (new DataService())->getClosedAnswersFromFile($file, 'survey-a')->getSamples();
+
+    expect($samples)->toBeInstanceOf(DataCollection::class)
+        ->and($samples->getDataClass())->toBe(SampleData::class)
+        ->and($samples)->toHaveCount(1);
+
+    $sample = $samples[0];
+
+    expect($sample->survey_id)->toBe('survey-a')
+        ->and($sample->interview_number)->toBe(1)
+        ->and($sample->sub_questionnaire_number)->toBe(1)
+        ->and($sample->interview_time_in_seconds)->toBe(120)
+        ->and($sample->number_of_screens_shown)->toBe(5)
+        ->and($sample->interrupt_indication)->toBe(InterruptIndicationEnum::BROKEN_OFF)
+        ->and($sample->interviewer_id)->toBe('INT00001')
+        ->and($sample->last_contact_at->toDateTimeString())->toBe('2024-01-15 10:30:00')
+        ->and($sample->odin_version)->toBe('6.1.2.0')
+        ->and($sample->idle_time)->toBe(42)
+        ->and($sample->week_number)->toBe(7)
+        ->and($sample->week_version_number)->toBe(3)
+        ->and($sample->family_member_number)->toBe(2)
+        ->and($sample->channel)->toBe(ChannelEnum::CAWI);
+
+    // upsert rows use the table's column names and plain values
+    expect($samples->toArray()[0])->toMatchArray([
+        'interrupt_indication' => 1,
+        'last_contact_at'      => '2024-01-15 10:30:00',
+        'channel'              => 2,
+    ]);
+
+    unlink($file);
+});
+
+it('reads blank and missing header columns as null', function () {
+    // interviewer and last contact blank, record ends after column 40
+    $file = writeFixture('00000001' . '  ' . '     ' . '    ' . ' ' . '        ' . '            ' . "\n");
+
+    $sample = (new DataService())->getClosedAnswersFromFile($file, 'survey-a')->getSamples()[0];
+
+    expect($sample->interview_number)->toBe(1)
+        ->and($sample->sub_questionnaire_number)->toBeNull()
+        ->and($sample->interrupt_indication)->toBeNull()
+        ->and($sample->interviewer_id)->toBeNull()
+        ->and($sample->last_contact_at)->toBeNull()
+        ->and($sample->odin_version)->toBeNull()
+        ->and($sample->channel)->toBeNull();
+
+    unlink($file);
+});
+
+it('persists the interview header onto the samples, filling stubs and refreshing on reload', function () {
+    $surveyId = 'survey-a';
+    Variable::create(['survey_id' => $surveyId, 'name' => 'Q1', 'type' => VariableTypeEnum::SINGLE, 'position' => 61, 'length' => 1, 'fraction' => 0]);
+    Variable::create(['survey_id' => $surveyId, 'name' => 'Q1_Other', 'type' => VariableTypeEnum::OPEN, 'position' => 62, 'length' => 5, 'fraction' => 0]);
+
+    // the open answer file first: creates a stub sample for interview 2
+    $open = writeFixture("000000020100062005 Free text\n");
+    $service = (new DataService())->setSurvey($surveyId);
+    $service->getOpenAnswersFromFile($open)->persist();
+
+    $stub = Sample::ofSurvey($surveyId)->where('interview_number', 2)->first();
+    expect($stub->interviewer_id)->toBeNull();
+
+    $closed = writeFixture(closedAnswerHeader('00000001') . "7     \n" . closedAnswerHeader('00000002', channel: '4') . "3     \n");
+    $service->getClosedAnswersFromFile($closed)->persist();
+
+    expect(Sample::ofSurvey($surveyId)->count())->toBe(2)
+        ->and(Answer::count())->toBe(3);
+
+    $stub->refresh();
+
+    expect($stub->interviewer_id)->toBe('INT00001')
+        ->and($stub->sub_questionnaire_number)->toBe(1)
+        ->and($stub->interview_time_in_seconds)->toBe(120)
+        ->and($stub->number_of_screens_shown)->toBe(5)
+        ->and($stub->interrupt_indication)->toBeNull()
+        ->and($stub->last_contact_at->toDateTimeString())->toBe('2024-01-15 10:30:00')
+        ->and($stub->odin_version)->toBe('6.1.2.0')
+        ->and($stub->idle_time)->toBe(42)
+        ->and($stub->channel)->toBe(ChannelEnum::CASI)
+        ->and($stub->getAnswers())->toBe(['q1' => 3, 'q1_other' => 'Free text']);
+
+    // reload with a changed header: same rows, updated columns
+    file_put_contents($closed, closedAnswerHeader('00000001') . "7     \n" . closedAnswerHeader('00000002', interrupt: '2', channel: '1') . "3     \n");
+    $service->getClosedAnswersFromFile($closed)->persist();
+
+    expect(Sample::count())->toBe(2)
+        ->and($stub->fresh()->interrupt_indication)->toBe(InterruptIndicationEnum::APPOINTMENT_MADE)
+        ->and($stub->fresh()->channel)->toBe(ChannelEnum::CATI);
+
+    // a later open answer load on the same service does not re-touch the samples
+    $service->getOpenAnswersFromFile($open);
+    expect($service->getSamples())->toHaveCount(0);
+
+    unlink($open);
+    unlink($closed);
 });
 
 it('persists closed answers in chunks', function () {

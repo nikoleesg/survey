@@ -5,6 +5,8 @@ namespace Nikoleesg\Survey\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Nikoleesg\Survey\Enums\ChannelEnum;
+use Nikoleesg\Survey\Enums\InterruptIndicationEnum;
 use Nikoleesg\Survey\Enums\ParadataLabelEnum;
 use Nikoleesg\Survey\Traits\BelongsToSurvey;
 
@@ -14,8 +16,10 @@ use Nikoleesg\Survey\Traits\BelongsToSurvey;
  * the subclass.
  *
  * Columns the package writes (do not remove or rename): id, survey_id,
- * interview_number, sub_questionnaire_number, interviewer_id,
- * interview_time_in_seconds, number_of_screens_shown, last_contact_at.
+ * interview_number, and the closed answer file header: sub_questionnaire_number,
+ * interview_time_in_seconds, number_of_screens_shown, interrupt_indication,
+ * interviewer_id, last_contact_at, odin_version, idle_time, week_number,
+ * week_version_number, family_member_number, channel.
  */
 class Sample extends Model
 {
@@ -30,7 +34,13 @@ class Sample extends Model
         'sub_questionnaire_number'  => 'integer',
         'interview_time_in_seconds' => 'integer',
         'number_of_screens_shown'   => 'integer',
+        'interrupt_indication'      => InterruptIndicationEnum::class,
         'last_contact_at'           => 'datetime',
+        'idle_time'                 => 'integer',
+        'week_number'               => 'integer',
+        'week_version_number'       => 'integer',
+        'family_member_number'      => 'integer',
+        'channel'                   => ChannelEnum::class,
     ];
 
     public const UPSERT_KEYS = ['survey_id', 'interview_number'];
