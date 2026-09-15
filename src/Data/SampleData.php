@@ -20,9 +20,8 @@ use Nikoleesg\Survey\Enums\InterruptIndicationEnum;
  */
 class SampleData extends Data
 {
-    // "!" zeroes the fields the format does not carry (seconds), which
-    // createFromFormat() would otherwise fill from the current time
-    public const LAST_CONTACT_FORMAT = '!YmdHi';
+    // columns 29-40, "date and time last contact" as YYYYMMDDHHMM
+    public const LAST_CONTACT_FORMAT = 'YmdHi';
 
     public function __construct(
         public string $survey_id,
@@ -84,9 +83,6 @@ class SampleData extends Data
         return $value === null ? null : (int)$value;
     }
 
-    /**
-     * Columns 29-40, "date and time last contact" as YYYYMMDDHHMM.
-     */
     protected static function lastContactOrNull(string $row): ?Carbon
     {
         $value = self::stringOrNull($row, 28, 12);
