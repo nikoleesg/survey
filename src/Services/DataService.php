@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as SupportCollection;
 use Spatie\LaravelData\DataCollection;
 use SplFileObject;
 use Carbon\Carbon;
@@ -17,6 +18,7 @@ use Nikoleesg\Survey\Data\OpenAnswerData;
 use Nikoleesg\Survey\Data\ParadataData;
 use Nikoleesg\Survey\Data\ClosedAnswerData;
 use Nikoleesg\Survey\Data\AnswerData;
+use Nikoleesg\Survey\Exceptions\NoDataLoadedException;
 
 class DataService implements Arrayable
 {
@@ -237,7 +239,8 @@ class DataService implements Arrayable
             'sub_questionnaire_number' => intval(Str::substr($fields, 8, 2)),
             'position'                 => intval(Str::substr($fields, 10, 5)),
             'length'                   => intval(Str::substr($fields, 15, 3)),
-            'code_number'              => $posNineteen === "" ? null : intval($posNineteen),
+            // column is NOT NULL (part of the unique key); blank means 0
+            'code_number'              => intval($posNineteen),
             'verbatim_text'            => Str::after($string, ' ')
         ];
     }
@@ -271,57 +274,107 @@ class DataService implements Arrayable
         return $fileContent;
     }
 
-    public function persist()
+    /**
+     * Upsert the loaded rows. Rows carry (survey_id, interview_number); these
+     * are resolved to a sample_id first, creating stub samples as needed, so
+     * the open answer / paradata files can be loaded before the closed answers.
+     *
+     * @throws NoDataLoadedException
+     */
+    public function persist(): self
     {
-        if (!$this->data instanceof DataCollection) {
-            // TODO: throw exception
-        }
-
         $dataModel = match ($this->getData()->getDataClass()) {
-            OpenAnswerData::class   => config('survey.open_answer_model'),
-            ClosedAnswerData::class => config('survey.closed_answer_model'),
-            ParadataData::class     => config('survey.paradata_model')
+            AnswerData::class     => config('survey.closed_answer_model'),
+            OpenAnswerData::class => config('survey.open_answer_model'),
+            ParadataData::class   => config('survey.paradata_model'),
         };
 
-        $data = collect($this->getData()->toArray())
-            ->map(function ($item, $key) {
-                return array_merge($item, ['uuid' => Str::orderedUuid()]);
-            });
+        $rows = collect($this->getData()->toArray());
 
-        if ($data->count() == 0) {
-            // No data to persist
+        if ($rows->isEmpty()) {
             return $this;
         }
 
-        // md5 hash column
-        $dataKeys = array_keys($data->first());
+        $sampleIds = $this->resolveSampleIds($rows);
 
-        $uniqueKey = Arr::first($dataKeys, function ($item, $key) {
-            return Str::endsWith($item, '_md5');
-        });
+        $rows = $rows->map(fn (array $row) => [
+            'sample_id' => $sampleIds[$row['survey_id']][$row['interview_number']],
+            ...Arr::except($row, ['survey_id', 'interview_number']),
+        ]);
 
-        // update columns
-        $upsertKeys = Arr::except($dataKeys, [$uniqueKey,
-            'uuid',
-            'id']);
+        $uniqueBy   = $dataModel::UPSERT_KEYS;
+        $upsertKeys = array_values(array_diff(array_keys($rows->first()), $uniqueBy));
 
-        // chunk upsert
-        $size = config('survey.persist_chunk_size');
-
-        foreach ($data->chunk(config('survey.persist_chunk_size')) as $chunk) {
-            $dataModel::upsert($chunk->toArray(), [$uniqueKey], $upsertKeys);
+        foreach ($rows->chunk(config('survey.persist_chunk_size')) as $chunk) {
+            $dataModel::upsert($chunk->values()->all(), $uniqueBy, $upsertKeys);
         }
 
         return $this;
     }
 
+    /**
+     * Map every (survey_id, interview_number) pair in $rows to a sample id,
+     * inserting samples that do not exist yet.
+     *
+     * @return array<string, array<int, int>> survey_id => [interview_number => sample id]
+     */
+    protected function resolveSampleIds(SupportCollection $rows): array
+    {
+        $sampleModel = config('survey.sample_model');
+
+        $sampleIds = [];
+
+        foreach ($rows->groupBy('survey_id') as $surveyId => $group) {
+
+            $interviewNumbers = $group->pluck('interview_number')->unique()->values();
+
+            $existing = $sampleModel::query()
+                ->ofSurvey($surveyId)
+                ->whereIn('interview_number', $interviewNumbers)
+                ->pluck('id', 'interview_number');
+
+            $missing = $interviewNumbers
+                ->reject(fn (int $number) => $existing->has($number))
+                ->map(fn (int $number) => ['survey_id' => $surveyId, 'interview_number' => $number]);
+
+            foreach ($missing->chunk(config('survey.persist_chunk_size')) as $chunk) {
+                $sampleModel::insert($this->withTimestamps($chunk->values()->all()));
+            }
+
+            $sampleIds[$surveyId] = $sampleModel::query()
+                ->ofSurvey($surveyId)
+                ->whereIn('interview_number', $interviewNumbers)
+                ->pluck('id', 'interview_number')
+                ->all();
+        }
+
+        return $sampleIds;
+    }
+
+    /**
+     * Model::insert() bypasses Eloquent timestamps; add them by hand.
+     */
+    protected function withTimestamps(array $rows): array
+    {
+        $now = Carbon::now();
+
+        return array_map(fn (array $row) => $row + ['created_at' => $now, 'updated_at' => $now], $rows);
+    }
+
+    /**
+     * @throws NoDataLoadedException
+     */
     public function getData(): DataCollection
     {
+        if (!isset($this->data)) {
+            throw NoDataLoadedException::make();
+        }
+
         return $this->data;
     }
 
     public function toArray(): array
     {
-        return $this->data instanceof DataCollection ? $this->data->toArray() : [];
+        return isset($this->data) ? $this->data->toArray() : [];
     }
 }
