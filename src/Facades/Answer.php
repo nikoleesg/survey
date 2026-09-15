@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Facade;
 use Nikoleesg\Survey\Services\AnswerService;
 
 /**
- * @see \Nikoleesg\Survey\AnswerService
+ * @see \Nikoleesg\Survey\Services\AnswerService
  */
 class Answer extends Facade
 {

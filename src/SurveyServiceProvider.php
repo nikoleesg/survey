@@ -4,7 +4,6 @@ namespace Nikoleesg\Survey;
 
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use Nikoleesg\Survey\Commands\SurveyCommand;
 
 class SurveyServiceProvider extends PackageServiceProvider
 {
@@ -19,7 +18,6 @@ class SurveyServiceProvider extends PackageServiceProvider
             ->name('survey')
             ->hasConfigFile()
             ->hasViews()
-            ->hasMigration('create_survey_tables')
-            ->hasCommand(SurveyCommand::class);
+            ->hasMigration('create_survey_tables');
     }
 }

@@ -75,10 +75,7 @@
         "laravel": {
             "providers": [
                 "Nikoleesg\\Survey\\SurveyServiceProvider"
-            ],
-            "aliases": {
-                "Survey": "Nikoleesg\\Survey\\Facades\\Survey"
-            }
+            ]
         }
     },
     "minimum-stability": "dev",

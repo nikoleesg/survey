@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Facade;
 use Nikoleesg\Survey\Services\DataService;
 
 /**
- * @see \Nikoleesg\Survey\DataService
+ * @see \Nikoleesg\Survey\Services\DataService
  */
 class Data extends Facade
 {
