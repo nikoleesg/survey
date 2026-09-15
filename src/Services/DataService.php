@@ -190,7 +190,7 @@ class DataService implements Arrayable
         $pattern = config("survey.formats.$format");
 
         try {
-            $date = Carbon::createFromFormat($pattern, trim($content));
+            $date = Carbon::createFromFormat($pattern, trim($content), config('survey.timezone') ?? config('app.timezone'));
         } catch (InvalidFormatException) {
             $date = false;
         }

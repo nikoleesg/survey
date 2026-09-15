@@ -48,4 +48,16 @@ return [
         'time'     => 'Hi',
     ],
 
+    /*
+    |-------------------------------------------------------------------------
+    | Timezone
+    |-------------------------------------------------------------------------
+    |
+    | Timezone the closed-answer export was written in. Date/time columns are
+    | parsed in it when loaded and read back in it from survey_answers. Leave
+    | null to use the application timezone (config app.timezone).
+    |
+    */
+    'timezone' => env('SURVEY_TIMEZONE'),
+
 ];

@@ -149,7 +149,7 @@ class AnswerService
                         };
                         break;
                     case VariableTypeEnum::DATETIME:
-                        $answer = $result === null ? null : Carbon::parse($result, 'Asia/Singapore');
+                        $answer = $result === null ? null : Carbon::parse($result, config('survey.timezone') ?? config('app.timezone'));
                         break;
                     default:
                         $answer = $result;
