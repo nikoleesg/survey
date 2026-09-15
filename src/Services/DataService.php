@@ -18,7 +18,9 @@ use Nikoleesg\Survey\Data\OpenAnswerData;
 use Nikoleesg\Survey\Data\ParadataData;
 use Nikoleesg\Survey\Data\ClosedAnswerData;
 use Nikoleesg\Survey\Data\AnswerData;
+use Nikoleesg\Survey\Exceptions\MissingSurveyIdException;
 use Nikoleesg\Survey\Exceptions\NoDataLoadedException;
+use Nikoleesg\Survey\Exceptions\UnreadableFileException;
 
 class DataService implements Arrayable
 {
@@ -35,22 +37,45 @@ class DataService implements Arrayable
 
     /**
      * Explicit argument, then setSurvey(), then the configured default.
+     *
+     * @throws MissingSurveyIdException
      */
     protected function resolveSurveyId(?string $surveyId): string
     {
-        return $surveyId ?? $this->surveyId ?? config('survey.survey_id');
+        $surveyId = $surveyId ?? $this->surveyId ?? config('survey.survey_id');
+
+        if ($surveyId === null || $surveyId === '') {
+            throw MissingSurveyIdException::make();
+        }
+
+        return $surveyId;
+    }
+
+    /**
+     * @throws UnreadableFileException
+     */
+    protected function openFile(string $fileName, string $loader): SplFileObject
+    {
+        if (!is_file($fileName) || !is_readable($fileName)) {
+            throw UnreadableFileException::make($fileName, $loader);
+        }
+
+        return new SplFileObject($fileName);
     }
 
     /**
      * @param string $fileName
      * @param string|null $surveyId
      * @return $this
+     *
+     * @throws MissingSurveyIdException
+     * @throws UnreadableFileException
      */
     public function getClosedAnswersFromFile(string $fileName, ?string $surveyId = null): self
     {
         $surveyId = $this->resolveSurveyId($surveyId);
 
-        $content = new SplFileObject($fileName);
+        $content = $this->openFile($fileName, __FUNCTION__);
 
         $result = [];
 
@@ -152,12 +177,15 @@ class DataService implements Arrayable
      * @param string $fileName
      * @param string|null $surveyId
      * @return $this
+     *
+     * @throws MissingSurveyIdException
+     * @throws UnreadableFileException
      */
     public function getParadatafromFile(string $fileName, ?string $surveyId = null): self
     {
         $surveyId = $this->resolveSurveyId($surveyId);
 
-        $csvContent = $this->getCsvFileContent($fileName);
+        $csvContent = $this->getCsvFileContent($fileName, __FUNCTION__);
 
         // Regular expression pattern
         $pattern = '/^(\d{8})\t([^\t]*)\t(.*?)\R*$/m';
@@ -196,12 +224,15 @@ class DataService implements Arrayable
      * @param string $fileName
      * @param string|null $surveyId
      * @return $this
+     *
+     * @throws MissingSurveyIdException
+     * @throws UnreadableFileException
      */
     public function getOpenAnswersFromFile(string $fileName, ?string $surveyId = null): self
     {
         $surveyId = $this->resolveSurveyId($surveyId);
 
-        $content = new SplFileObject($fileName);
+        $content = $this->openFile($fileName, __FUNCTION__);
 
         $result = [];
 
@@ -247,13 +278,20 @@ class DataService implements Arrayable
 
     /**
      * @param string $fileName
+     * @param string $loader
      * @param string $encode
      * @return string
+     *
+     * @throws UnreadableFileException
      */
-    protected function getCsvFileContent(string $fileName, string $encode = 'UTF-16LE'): string
+    protected function getCsvFileContent(string $fileName, string $loader, string $encode = 'UTF-16LE'): string
     {
         // Open the file with read-only access
-        $fileHandle = fopen($fileName, 'r');
+        $fileHandle = @fopen($fileName, 'r');
+
+        if ($fileHandle === false) {
+            throw UnreadableFileException::make($fileName, $loader);
+        }
 
         $firstLine = fgets($fileHandle);
 

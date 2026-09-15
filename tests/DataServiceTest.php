@@ -4,7 +4,11 @@ use Nikoleesg\Survey\Data\AnswerData;
 use Nikoleesg\Survey\Data\OpenAnswerData;
 use Nikoleesg\Survey\Data\ParadataData;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
+use Nikoleesg\Survey\Exceptions\MissingSurveyIdException;
 use Nikoleesg\Survey\Exceptions\NoDataLoadedException;
+use Nikoleesg\Survey\Exceptions\SurveyException;
+use Nikoleesg\Survey\Exceptions\UnreadableFileException;
+use Nikoleesg\Survey\Services\AnswerService;
 use Nikoleesg\Survey\Models\Answer;
 use Nikoleesg\Survey\Models\OpenAnswer;
 use Nikoleesg\Survey\Models\Paradata;
@@ -125,6 +129,35 @@ it('loads closed answers from file into a DataCollection', function () {
 it('throws when persisting before any file is loaded', function () {
     (new DataService())->persist();
 })->throws(NoDataLoadedException::class);
+
+it('throws when no survey id can be resolved', function (string $method) {
+    config()->set('survey.survey_id', null);
+
+    (new DataService())->{$method}(writeFixture(''));
+})->with(['getOpenAnswersFromFile', 'getParadatafromFile', 'getClosedAnswersFromFile'])
+    ->throws(MissingSurveyIdException::class);
+
+it('throws from AnswerService when no survey id can be resolved', function () {
+    config()->set('survey.survey_id', '');
+
+    (new AnswerService())->getAnswers();
+})->throws(MissingSurveyIdException::class);
+
+it('throws a named exception for an unreadable file', function (string $method) {
+    (new DataService())->{$method}('/nonexistent/survey.dat', 'survey-a');
+})->with(['getOpenAnswersFromFile', 'getParadatafromFile', 'getClosedAnswersFromFile'])
+    ->throws(UnreadableFileException::class, '/nonexistent/survey.dat');
+
+it('names the loader in the unreadable file message', function () {
+    expect(fn () => (new DataService())->getOpenAnswersFromFile('/nonexistent/survey.dat', 'survey-a'))
+        ->toThrow(UnreadableFileException::class, 'getOpenAnswersFromFile');
+});
+
+it('exposes every package exception under a common base', function () {
+    expect(NoDataLoadedException::make())->toBeInstanceOf(SurveyException::class)
+        ->and(MissingSurveyIdException::make())->toBeInstanceOf(SurveyException::class)
+        ->and(UnreadableFileException::make('f', 'l'))->toBeInstanceOf(SurveyException::class);
+});
 
 it('persists open answers, creating stub samples and upserting on re-run', function () {
     $file = writeFixture(

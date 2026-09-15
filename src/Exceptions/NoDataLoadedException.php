@@ -2,9 +2,7 @@
 
 namespace Nikoleesg\Survey\Exceptions;
 
-use RuntimeException;
-
-class NoDataLoadedException extends RuntimeException
+class NoDataLoadedException extends SurveyException
 {
     public static function make(): self
     {

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 use Nikoleesg\Survey\Models\Variable;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
-
+use Nikoleesg\Survey\Exceptions\MissingSurveyIdException;
 
 class AnswerService
 {
@@ -48,9 +48,20 @@ class AnswerService
         return $this;
     }
 
+    /**
+     * setSurvey() / constructor argument, then the configured default.
+     *
+     * @throws MissingSurveyIdException
+     */
     protected function resolveSurveyId(): string
     {
-        return $this->surveyId ?? config('survey.survey_id');
+        $surveyId = $this->surveyId ?? config('survey.survey_id');
+
+        if ($surveyId === null || $surveyId === '') {
+            throw MissingSurveyIdException::make();
+        }
+
+        return $surveyId;
     }
 
     public function setInterview(int|array $interviewId): self
@@ -66,6 +77,9 @@ class AnswerService
         return $this;
     }
 
+    /**
+     * @throws MissingSurveyIdException
+     */
     public function getAnswers(int|array|null $filteredInterview = null, array|EloquentCollection|null $filteredVariable = null)
     {
         $surveyId = $this->resolveSurveyId();

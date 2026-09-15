@@ -56,6 +56,16 @@ $survey = new Nikoleesg\Survey();
 echo $survey->echoPhrase('Hello, Nikoleesg!');
 ```
 
+## Exceptions
+
+Every exception the package throws extends `Nikoleesg\Survey\Exceptions\SurveyException` (a `RuntimeException`), so a single `catch (SurveyException $e)` covers them all.
+
+| Exception | Thrown when |
+|---|---|
+| `MissingSurveyIdException` | No survey id could be resolved: none passed, none set via `setSurvey()`, and `survey.survey_id` is null or empty. |
+| `UnreadableFileException` | A `get*FromFile()` loader is given a path that does not exist or cannot be read. The message names the loader and the path. |
+| `NoDataLoadedException` | `persist()` or `getData()` is called before any `get*FromFile()` loader. |
+
 ## Testing
 
 ```bash
