@@ -83,7 +83,7 @@ class Sample extends Model
     }
 
     /**
-     * All of the sample's answers merged into one array keyed by variable slug.
+     * All the sample's answers merged into one array keyed by variable slug.
      */
     public function getAnswers(): array
     {
