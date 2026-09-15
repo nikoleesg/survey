@@ -56,7 +56,7 @@ return new class extends Migration
             $table->string('interviewer_id')->nullable();
             $table->dateTime('last_contact_at')->nullable();
             $table->string('odin_version')->nullable();
-            $table->unsignedInteger('idle_time')->nullable();
+            $table->unsignedInteger('idle_time_in_seconds')->nullable();
             // CASI only
             $table->unsignedTinyInteger('week_number')->nullable();
             $table->unsignedTinyInteger('week_version_number')->nullable();

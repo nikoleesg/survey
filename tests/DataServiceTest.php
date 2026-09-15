@@ -481,7 +481,7 @@ it('parses the 60-column system header of a closed answer record into a SampleDa
         ->and($sample->interviewer_id)->toBe('INT00001')
         ->and($sample->last_contact_at->toDateTimeString())->toBe('2024-01-15 10:30:00')
         ->and($sample->odin_version)->toBe('6.1.2.0')
-        ->and($sample->idle_time)->toBe(42)
+        ->and($sample->idle_time_in_seconds)->toBe(42)
         ->and($sample->week_number)->toBe(7)
         ->and($sample->week_version_number)->toBe(3)
         ->and($sample->family_member_number)->toBe(2)
@@ -542,7 +542,7 @@ it('persists the interview header onto the samples, filling stubs and refreshing
         ->and($stub->interrupt_indication)->toBeNull()
         ->and($stub->last_contact_at->toDateTimeString())->toBe('2024-01-15 10:30:00')
         ->and($stub->odin_version)->toBe('6.1.2.0')
-        ->and($stub->idle_time)->toBe(42)
+        ->and($stub->idle_time_in_seconds)->toBe(42)
         ->and($stub->channel)->toBe(ChannelEnum::CASI)
         ->and($stub->getAnswers())->toBe(['q1' => 3, 'q1_other' => 'Free text']);
 

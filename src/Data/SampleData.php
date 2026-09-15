@@ -36,7 +36,7 @@ class SampleData extends Data
         #[WithCast(CarbonCast::class), WithTransformer(DateTimeInterfaceTransformer::class, format: 'Y-m-d H:i:s')]
         public ?Carbon $last_contact_at,
         public ?string $odin_version,
-        public ?int $idle_time,
+        public ?int $idle_time_in_seconds,
         public ?int $week_number,
         public ?int $week_version_number,
         public ?int $family_member_number,
@@ -62,7 +62,7 @@ class SampleData extends Data
             last_contact_at:           self::lastContactOrNull($row),
             // column 41 is always "0"
             odin_version:              self::stringOrNull($row, 41, 7),
-            idle_time:                 self::intOrNull($row, 48, 5),
+            idle_time_in_seconds:      self::intOrNull($row, 48, 5),
             week_number:               self::intOrNull($row, 53, 2),
             week_version_number:       self::intOrNull($row, 55, 2),
             family_member_number:      self::intOrNull($row, 57, 2),
