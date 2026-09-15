@@ -76,7 +76,7 @@ class DataService implements Arrayable
             }
         }
 
-        $this->data = AnswerData::collection($result);
+        $this->data = AnswerData::collect($result, DataCollection::class);
 
         return $this;
     }
@@ -129,7 +129,7 @@ class DataService implements Arrayable
             $answers[] = $answerData;
         }
 
-        return AnswerData::collection($answers);
+        return AnswerData::collect($answers, DataCollection::class);
     }
 
     /**
@@ -194,7 +194,7 @@ class DataService implements Arrayable
             }
         }
 
-        $this->data = ParadataData::collection($result);
+        $this->data = ParadataData::collect($result, DataCollection::class);
 
         return $this;
     }
@@ -229,7 +229,7 @@ class DataService implements Arrayable
             }
         }
 
-        $this->data = OpenAnswerData::collection($result);
+        $this->data = OpenAnswerData::collect($result, DataCollection::class);
 
         return $this;
     }

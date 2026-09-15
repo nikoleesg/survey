@@ -4,10 +4,11 @@ namespace Nikoleesg\Survey\Data\Transformers;
 
 use Spatie\LaravelData\Transformers\Transformer;
 use Spatie\LaravelData\Support\DataProperty;
+use Spatie\LaravelData\Support\Transformation\TransformationContext;
 
 class JsonableTransformer implements Transformer
 {
-    public function transform(DataProperty $property, mixed $value): string
+    public function transform(DataProperty $property, mixed $value, TransformationContext $context): string
     {
         return json_encode($value);
     }
