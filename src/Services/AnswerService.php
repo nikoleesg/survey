@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Builder;
+use InvalidArgumentException;
 use Carbon\Carbon;
 use Nikoleesg\Survey\Models\Variable;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
@@ -64,23 +65,32 @@ class AnswerService
         return $surveyId;
     }
 
+    /**
+     * @throws InvalidArgumentException when given anything but an int or a list of ints
+     */
     public function setInterview(int|array $interviewId): self
     {
         if (is_int($interviewId)) {
-            $this->interviewId = [$interviewId];
+            $interviewId = [$interviewId];
         }
 
-        if ($this->isIntegerList($interviewId)) {
-            $this->interviewId = $interviewId;
+        if (!$this->isIntegerList($interviewId)) {
+            throw new InvalidArgumentException('Interview id must be an integer or a list of integers.');
         }
+
+        $this->interviewId = $interviewId;
 
         return $this;
     }
 
     /**
+     * Answers of the resolved survey, grouped by interview number. Only
+     * variables of that survey are considered, so a variable id or
+     * collection from another survey yields nothing.
+     *
      * @throws MissingSurveyIdException
      */
-    public function getAnswers(int|array|null $filteredInterview = null, array|EloquentCollection|null $filteredVariable = null)
+    public function getAnswers(int|array|null $filteredInterview = null, array|EloquentCollection|null $filteredVariable = null): Collection
     {
         $surveyId = $this->resolveSurveyId();
 
@@ -97,6 +107,11 @@ class AnswerService
             $variables = $variableQuery->get();
         }
 
+        // whereBelongsTo() rejects an empty collection; no variables means no answers
+        if ($variables->isEmpty()) {
+            return new Collection();
+        }
+
         // set interview
         if (is_int($filteredInterview) || $this->isIntegerList($filteredInterview)) {
             $this->setInterview($filteredInterview);
@@ -111,7 +126,7 @@ class AnswerService
         });
 
         return $builder
-            ->whereBelongsTo($variables)
+            ->whereBelongsTo($variables, 'variable')
             ->get()
             ->map(function ($item) {
 
@@ -125,7 +140,7 @@ class AnswerService
                 switch ($item->variable->type) {
                     case VariableTypeEnum::OPEN:
                     case VariableTypeEnum::ALPHA:
-                        $answer = Str::squish($result);
+                        $answer = $result === null ? null : Str::squish($result);
                         break;
                     case VariableTypeEnum::DATETIME:
                         $answer = Carbon::parse($result, 'Asia/Singapore');
