@@ -345,17 +345,19 @@ class DataService implements Arrayable
     protected function getCsvFileContent(string $fileName, string $loader, string $encode = 'UTF-16LE'): string
     {
         // Open the file with read-only access
-        $fileHandle = @fopen($fileName, 'r');
+        $fileHandle = @fopen($fileName, 'rb');
 
         if ($fileHandle === false) {
             throw UnreadableFileException::make($fileName, $loader);
         }
 
-        $firstLine = fgets($fileHandle);
+        // Skip a UTF-16 BOM (LE or BE) if present; otherwise read from byte 0.
+        // Reading raw bytes with fgets would stop in the middle of a UTF-16
+        // code unit, so only ever look at the first two bytes here.
+        $bom = fread($fileHandle, 2);
 
-        if (str_starts_with($firstLine, "\xFF\xFE")) {
-            // BOM detected, skip the first two bytes
-            fseek($fileHandle, 2);
+        if ($bom !== "\xFF\xFE" && $bom !== "\xFE\xFF") {
+            rewind($fileHandle);
         }
 
         // Add a stream filter to convert UTF-16 LE to UTF-8

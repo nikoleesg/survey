@@ -156,6 +156,38 @@ it('loads paradata from a UTF-16LE file into a DataCollection', function () {
     unlink($file);
 });
 
+it('keeps the first paradata record when the file has no BOM', function () {
+    $content = mb_convert_encoding(
+        "00000001\tStartTime\t2024-01-15 10:30:00\r\n00000001\tDevice\tPhone\r\n",
+        'UTF-16LE',
+        'UTF-8'
+    );
+    $file = writeFixture($content);
+
+    $data = (new DataService())->getParadatafromFile($file, 'survey-a')->getData();
+
+    expect($data)->toHaveCount(2)
+        ->and($data->toArray()[0])->toMatchArray([
+            'interview_number' => 1,
+            'label'            => 'StartTime',
+            'result'           => '2024-01-15 10:30:00',
+        ])
+        ->and($data->toArray()[1])->toMatchArray([
+            'label'  => 'Device',
+            'result' => 'Phone',
+        ]);
+
+    unlink($file);
+});
+
+it('loads an empty paradata file as an empty collection', function () {
+    $file = writeFixture('');
+
+    expect((new DataService())->getParadatafromFile($file, 'survey-a')->getData())->toHaveCount(0);
+
+    unlink($file);
+});
+
 it('loads closed answers from file into a DataCollection', function () {
     $surveyId = 'survey-a';
 
