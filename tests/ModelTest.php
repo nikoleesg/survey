@@ -1,5 +1,6 @@
 <?php
 
+use Nikoleesg\Survey\Enums\ParadataLabelEnum;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
 use Nikoleesg\Survey\Models\Answer;
 use Nikoleesg\Survey\Models\OpenAnswer;
@@ -74,7 +75,9 @@ it('relates sample to answers, open answers and paradata', function () {
         ->and($sample->getAnswers())->toBe(['q1' => 3])
         ->and($sample->openAnswers)->toHaveCount(1)
         ->and($sample->paradata)->toHaveCount(1)
-        ->and($sample->paradataOfDeviceId->result)->toBe('abc')
+        ->and($sample->paradataOf(ParadataLabelEnum::DEVICE_ID)->first()->result)->toBe('abc')
+        ->and($sample->paradataOf('DeviceId')->first()->result)->toBe('abc')
+        ->and($sample->paradataOf(ParadataLabelEnum::QUOTA)->first())->toBeNull()
         ->and($sample->answers->first()->sample->is($sample))->toBeTrue()
         ->and($sample->answers->first()->variable->is($variable))->toBeTrue()
         ->and($variable->answers)->toHaveCount(2)

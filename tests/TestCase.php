@@ -37,9 +37,6 @@ class TestCase extends Orchestra
 
     protected function defineDatabaseMigrations(): void
     {
-        // same order as the service provider: samples/variables before the FK tables
-        foreach (['variables', 'samples', 'answers', 'open_answers', 'paradatas'] as $table) {
-            (include __DIR__."/../database/migrations/create_{$table}_table.php.stub")->up();
-        }
+        (include __DIR__.'/../database/migrations/create_survey_tables.php.stub')->up();
     }
 }

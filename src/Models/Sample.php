@@ -3,11 +3,10 @@
 namespace Nikoleesg\Survey\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Nikoleesg\Survey\Enums\ParadataLabelEnum;
 use Nikoleesg\Survey\Traits\BelongsToSurvey;
-use Nikoleesg\Survey\Traits\HasAnswers;
-use Nikoleesg\Survey\Traits\HasOpenAnswers;
-use Nikoleesg\Survey\Traits\HasParadata;
-use Nikoleesg\Survey\Traits\HasTablePrefix;
 
 /**
  * One interview of a survey. Consumer apps extend this model and add their
@@ -20,8 +19,9 @@ use Nikoleesg\Survey\Traits\HasTablePrefix;
  */
 class Sample extends Model
 {
-    use HasTablePrefix, BelongsToSurvey;
-    use HasAnswers, HasOpenAnswers, HasParadata;
+    use BelongsToSurvey;
+
+    protected $table = 'survey_samples';
 
     protected $guarded = [];
 
@@ -34,4 +34,47 @@ class Sample extends Model
     ];
 
     public const UPSERT_KEYS = ['survey_id', 'interview_number'];
+
+    public function answers(): HasMany
+    {
+        return $this->hasMany(config('survey.closed_answer_model'), 'sample_id');
+    }
+
+    /**
+     * All of the sample's answers merged into one array keyed by variable slug.
+     */
+    public function getAnswers(): array
+    {
+        $answerRelation = $this->relationLoaded('answers') ? $this->answers : $this->answers();
+
+        $answers = [];
+
+        $answerRelation->pluck('result')
+            ->each(function ($item) use (&$answers) {
+                if (is_array($item)) {
+                    $answers = array_merge($answers, $item);
+                }
+            });
+
+        return $answers;
+    }
+
+    public function openAnswers(): HasMany
+    {
+        return $this->hasMany(config('survey.open_answer_model'), 'sample_id');
+    }
+
+    public function paradata(): HasMany
+    {
+        return $this->hasMany(config('survey.paradata_model'), 'sample_id');
+    }
+
+    /**
+     * The single paradata row for one label, e.g.
+     * $sample->paradataOf(ParadataLabelEnum::DEVICE_ID)->first()?->result
+     */
+    public function paradataOf(ParadataLabelEnum|string $label): HasOne
+    {
+        return $this->paradata()->one()->ofLabel($label);
+    }
 }

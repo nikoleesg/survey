@@ -10,7 +10,6 @@ use Spatie\LaravelData\WithData;
 use Spatie\EloquentSortable\Sortable;
 use Spatie\EloquentSortable\SortableTrait;
 use Nikoleesg\Survey\Traits\BelongsToSurvey;
-use Nikoleesg\Survey\Traits\HasTablePrefix;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 use Nikoleesg\Survey\Data\VariableData;
@@ -18,8 +17,10 @@ use Nikoleesg\Survey\Enums\VariableTypeEnum;
 
 class Variable extends Model implements Sortable
 {
-    use HasUuids, HasTablePrefix, BelongsToSurvey;
+    use HasUuids, BelongsToSurvey;
     use WithData, SortableTrait, HasSlug;
+
+    protected $table = 'survey_variables';
 
     protected $dataClass = VariableData::class;
 

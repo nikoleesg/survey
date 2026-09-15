@@ -1,0 +1,109 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * Order matters: samples and variables first, the three tables that
+     * reference them after.
+     */
+    public function up(): void
+    {
+        Schema::create('survey_variables', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('uuid')->unique();
+            $table->string('survey_id');
+
+            $table->string('name');
+            $table->string('slug');
+            $table->string('label')->nullable();
+
+            $table->unsignedTinyInteger('type');
+            $table->json('codes')->nullable();
+            $table->json('options')->nullable();
+            $table->unsignedInteger('position')->nullable();
+            $table->unsignedInteger('length')->nullable();
+            $table->unsignedInteger('fraction')->nullable();
+            $table->json('formula')->nullable();
+
+            $table->text('remark')->nullable();
+            $table->boolean('is_dynamic')->default(false);
+            $table->boolean('is_active')->default(true);
+            $table->unsignedInteger('order_column')->nullable();
+
+            $table->timestamps();
+
+            $table->unique(['survey_id', 'slug']);
+        });
+
+        Schema::create('survey_samples', function (Blueprint $table) {
+            $table->id();
+            $table->string('survey_id');
+            $table->unsignedBigInteger('interview_number');
+
+            // interview-level fields from the closed answer file header;
+            // nullable because a sample may be created as a stub from the
+            // open answer / paradata files before the closed answers are loaded
+            $table->unsignedTinyInteger('sub_questionnaire_number')->nullable();
+            $table->string('interviewer_id')->nullable();
+            $table->unsignedInteger('interview_time_in_seconds')->nullable();
+            $table->unsignedSmallInteger('number_of_screens_shown')->nullable();
+            $table->dateTime('last_contact_at')->nullable();
+
+            $table->timestamps();
+
+            $table->unique(['survey_id', 'interview_number']);
+        });
+
+        Schema::create('survey_answers', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('sample_id')->constrained('survey_samples')->cascadeOnDelete();
+            $table->foreignId('variable_id')->constrained('survey_variables')->cascadeOnDelete();
+            $table->json('result');
+            $table->timestamps();
+
+            $table->unique(['sample_id', 'variable_id']);
+        });
+
+        Schema::create('survey_open_answers', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('sample_id')->constrained('survey_samples')->cascadeOnDelete();
+            $table->unsignedTinyInteger('sub_questionnaire_number')->nullable();
+            $table->unsignedMediumInteger('position');
+            $table->unsignedSmallInteger('length');
+            // NOT NULL so it can take part in the unique key (NULLs never collide)
+            $table->unsignedSmallInteger('code_number')->default(0);
+            $table->mediumText('verbatim_text');
+            $table->timestamps();
+
+            $table->unique(['sample_id', 'position', 'length', 'code_number'], 'unique_open_answers');
+        });
+
+        Schema::create('survey_paradatas', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('sample_id')->constrained('survey_samples')->cascadeOnDelete();
+            $table->string('label');
+            $table->mediumText('result')->nullable();
+            $table->timestamps();
+
+            $table->unique(['sample_id', 'label']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('survey_paradatas');
+        Schema::dropIfExists('survey_open_answers');
+        Schema::dropIfExists('survey_answers');
+        Schema::dropIfExists('survey_samples');
+        Schema::dropIfExists('survey_variables');
+    }
+};

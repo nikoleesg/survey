@@ -6,13 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\LaravelData\WithData;
 use Nikoleesg\Survey\Traits\BelongsToSample;
-use Nikoleesg\Survey\Traits\HasTablePrefix;
 use Nikoleesg\Survey\Data\AnswerData;
 
 class Answer extends Model
 {
-    use HasTablePrefix, BelongsToSample;
+    use BelongsToSample;
     use WithData;
+
+    protected $table = 'survey_answers';
 
     protected $guarded = [];
 
