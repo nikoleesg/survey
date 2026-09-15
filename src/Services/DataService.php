@@ -92,7 +92,9 @@ class DataService implements Arrayable
 
             if (Str::length($row = $content->fgets()) > 1) {
 
-                $string = preg_replace('/[[:^print:]]/', '', $row);
+                // only the line ending goes: dropping any other byte would
+                // shift every fixed-width column after it
+                $string = rtrim($row, "\r\n");
 
                 // parse closed answer of system variables
                 $closedAnswer = ClosedAnswerData::from($string);
@@ -275,7 +277,8 @@ class DataService implements Arrayable
 
                 $variable = $byColumns->get("{$openAnswer['position']}:{$openAnswer['length']}");
 
-                if ($variable === null) {
+                // no variable at these columns, or nothing was typed: not an answer
+                if ($variable === null || $openAnswer['verbatim_text'] === '') {
                     continue;
                 }
 
@@ -306,25 +309,28 @@ class DataService implements Arrayable
     }
 
     /**
-     * @param string $row
-     * @return array
+     * One line of the verbatim file: an ASCII header of fixed columns
+     * (interview 8, sub-questionnaire 2, position 5, length 3, code number up
+     * to the first space) followed by the verbatim text. The header is read
+     * by byte offset and the text is handed back as-is apart from surrounding
+     * whitespace, so multibyte characters and inner spacing survive.
+     *
+     * @return array{interview_number: int, sub_questionnaire_number: int, position: int, length: int, code_number: int, verbatim_text: string}
      */
     public function parseOpenAnswerString(string $row): array
     {
-        $string = Str::squish(preg_replace('/[[:^print:]]/', '', $row));
+        $row = rtrim($row, "\r\n");
 
-        $fields = Str::before($string, ' ');
-
-        $posNineteen = Str::substr($fields, 18, Str::length($fields) - 18);
+        $separator = strpos($row, ' ', 18);
 
         return [
-            'interview_number'         => intval(Str::substr($fields, 0, 8)),
-            'sub_questionnaire_number' => intval(Str::substr($fields, 8, 2)),
-            'position'                 => intval(Str::substr($fields, 10, 5)),
-            'length'                   => intval(Str::substr($fields, 15, 3)),
-            // column is NOT NULL (part of the unique key); blank means 0
-            'code_number'              => intval($posNineteen),
-            'verbatim_text'            => Str::after($string, ' ')
+            'interview_number'         => intval(substr($row, 0, 8)),
+            'sub_questionnaire_number' => intval(substr($row, 8, 2)),
+            'position'                 => intval(substr($row, 10, 5)),
+            'length'                   => intval(substr($row, 15, 3)),
+            // blank means a pure open question, not an "other, specify" of a code
+            'code_number'              => intval(substr($row, 18, $separator === false ? null : $separator - 18)),
+            'verbatim_text'            => $separator === false ? '' : trim(substr($row, $separator + 1)),
         ];
     }
 

@@ -78,6 +78,47 @@ it('keys several coded open answers of one variable by code number', function ()
     unlink($file);
 });
 
+it('keeps verbatim text intact: multibyte characters, inner spacing, CRLF', function () {
+    Variable::create(['survey_id' => 'survey-a', 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 10, 'length' => 5]);
+
+    $file = writeFixture(
+        "000000010100010005 Café,  très  bien 你好 👍\r\n".
+        "000000020100010005 \tindented\t\r\n"
+    );
+
+    $rows = (new DataService())->getOpenAnswersFromFile($file, 'survey-a')->getData()->toArray();
+
+    expect($rows)->toHaveCount(2)
+        ->and(json_decode($rows[0]['result'], true))->toBe(['q4' => 'Café,  très  bien 你好 👍'])
+        ->and(json_decode($rows[1]['result'], true))->toBe(['q4' => 'indented']);
+
+    unlink($file);
+});
+
+it('parses the open answer header by fixed columns', function (string $row, array $expected) {
+    expect((new DataService())->parseOpenAnswerString($row))->toBe($expected);
+})->with([
+    'pure open'          => ["000000010100010005 text\n", ['interview_number' => 1, 'sub_questionnaire_number' => 1, 'position' => 10, 'length' => 5, 'code_number' => 0, 'verbatim_text' => 'text']],
+    'coded'              => ["00000002010002000597 text\n", ['interview_number' => 2, 'sub_questionnaire_number' => 1, 'position' => 20, 'length' => 5, 'code_number' => 97, 'verbatim_text' => 'text']],
+    'space-padded code'  => ["000000010100010005   text\n", ['interview_number' => 1, 'sub_questionnaire_number' => 1, 'position' => 10, 'length' => 5, 'code_number' => 0, 'verbatim_text' => 'text']],
+    'empty verbatim'     => ["000000010100010005\n", ['interview_number' => 1, 'sub_questionnaire_number' => 1, 'position' => 10, 'length' => 5, 'code_number' => 0, 'verbatim_text' => '']],
+    'coded, empty'       => ["00000001010001000597\r\n", ['interview_number' => 1, 'sub_questionnaire_number' => 1, 'position' => 10, 'length' => 5, 'code_number' => 97, 'verbatim_text' => '']],
+    'blank after header' => ["000000010100010005    \n", ['interview_number' => 1, 'sub_questionnaire_number' => 1, 'position' => 10, 'length' => 5, 'code_number' => 0, 'verbatim_text' => '']],
+]);
+
+it('does not turn an empty verbatim into an answer', function () {
+    Variable::create(['survey_id' => 'survey-a', 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 10, 'length' => 5]);
+
+    $file = writeFixture("000000010100010005\n000000020100010005   \n000000030100010005 real\n");
+
+    $rows = (new DataService())->getOpenAnswersFromFile($file, 'survey-a')->getData()->toArray();
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['interview_number'])->toBe(3);
+
+    unlink($file);
+});
+
 it('ignores inactive OPEN variables when loading open answers', function () {
     Variable::create(['survey_id' => 'survey-a', 'name' => 'Q4', 'type' => VariableTypeEnum::OPEN, 'position' => 10, 'length' => 5, 'is_active' => false]);
 
@@ -194,6 +235,7 @@ it('maps each variable type from its columns', function (VariableTypeEnum $type,
     'numerical fraction'    => [VariableTypeEnum::NUMERICAL, 3, '12345', 123.45, 2],
     'alpha trims padding'   => [VariableTypeEnum::ALPHA, 6, 'Blue  ', 'Blue'],
     'alpha keeps inner'     => [VariableTypeEnum::ALPHA, 9, 'Dark blue', 'Dark blue'],
+    'alpha multibyte'       => [VariableTypeEnum::ALPHA, 6, 'Café  ', 'Café'],
     'datetime'              => [VariableTypeEnum::DATETIME, 18, '2024/01/15 1030:45', '2024-01-15 10:30:45'],
     'date'                  => [VariableTypeEnum::DATE, 10, '2024/01/15', '2024-01-15'],
     'time'                  => [VariableTypeEnum::TIME, 4, '1030', '10:30:00'],
@@ -201,6 +243,20 @@ it('maps each variable type from its columns', function (VariableTypeEnum $type,
     'matrix'                => [VariableTypeEnum::MATRIX, 3, '123', null],
     'dummy'                 => [VariableTypeEnum::DUMMY, 3, '123', null],
 ]);
+
+it('keeps columns after a multibyte ALPHA value in place', function () {
+    $alpha = Variable::create(['survey_id' => 'survey-a', 'name' => 'Q1', 'type' => VariableTypeEnum::ALPHA, 'position' => 41, 'length' => 4]);
+    $single = Variable::create(['survey_id' => 'survey-a', 'name' => 'Q2', 'type' => VariableTypeEnum::SINGLE, 'position' => 45, 'length' => 1]);
+
+    $file = writeFixture(closedAnswerRow('Café' . '7' . "\r"));
+
+    $byVariable = collect((new DataService())->getClosedAnswersFromFile($file, 'survey-a')->getData()->toArray())->keyBy('variable_id');
+
+    expect(json_decode($byVariable[$alpha->id]['result'], true))->toBe(['q1' => 'Café'])
+        ->and(json_decode($byVariable[$single->id]['result'], true))->toBe(['q2' => 7]);
+
+    unlink($file);
+});
 
 it('stores a blank column as null, not 0', function (VariableTypeEnum $type, int $length) {
     expect(loadSingleVariable($type, $length, str_repeat(' ', $length)))->toBeNull();
