@@ -35,4 +35,19 @@ return [
 
     'persist_chunk_size' => 500,
 
+    /*
+    |-------------------------------------------------------------------------
+    | Date / time column formats
+    |-------------------------------------------------------------------------
+    |
+    | PHP date formats used to parse DATETIME, DATE and TIME variable columns
+    | of the closed-answer export. Adjust them to match your export layout.
+    |
+    */
+    'formats' => [
+        'datetime' => 'Y/m/d Hi:s',
+        'date'     => 'Y/m/d',
+        'time'     => 'Hi',
+    ],
+
 ];

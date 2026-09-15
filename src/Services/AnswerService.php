@@ -143,7 +143,7 @@ class AnswerService
                         $answer = $result === null ? null : Str::squish($result);
                         break;
                     case VariableTypeEnum::DATETIME:
-                        $answer = Carbon::parse($result, 'Asia/Singapore');
+                        $answer = $result === null ? null : Carbon::parse($result, 'Asia/Singapore');
                         break;
                     default:
                         $answer = $result;

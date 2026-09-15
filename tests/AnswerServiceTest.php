@@ -66,6 +66,14 @@ it('returns null rather than an empty string for a missing open answer', functio
     expect($service->getAnswer(1, $variable->id)['answer'])->toBe('spaced out');
 });
 
+it('returns null rather than now for an unanswered datetime', function () {
+    $variable = Variable::create(['survey_id' => 'survey-a', 'name' => 'Q5', 'type' => VariableTypeEnum::DATETIME, 'position' => 41, 'length' => 18, 'fraction' => 0]);
+    $sample = Sample::create(['survey_id' => 'survey-a', 'interview_number' => 1]);
+    Answer::create(['sample_id' => $sample->id, 'variable_id' => $variable->id, 'result' => ['q5' => null]]);
+
+    expect((new AnswerService('survey-a'))->getAnswer(1, $variable->id)['answer'])->toBeNull();
+});
+
 it('rejects an interview filter that is not an integer list', function (mixed $interviewId) {
     (new AnswerService('survey-a'))->setInterview($interviewId);
 })->with([

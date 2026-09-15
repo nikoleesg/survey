@@ -65,6 +65,7 @@ Every exception the package throws extends `Nikoleesg\Survey\Exceptions\SurveyEx
 | `MissingSurveyIdException` | No survey id could be resolved: none passed, none set via `setSurvey()`, and `survey.survey_id` is null or empty. |
 | `UnreadableFileException` | A `get*FromFile()` loader is given a path that does not exist or cannot be read. The message names the loader and the path. |
 | `NoDataLoadedException` | `persist()` or `getData()` is called before any `get*FromFile()` loader. |
+| `UnparseableColumnException` | A non-blank `DATETIME`/`DATE`/`TIME` column in the closed-answer file does not match its `survey.formats.*` pattern. The message names the interview, variable, raw value and format. Blank columns are stored as `null`, not thrown. |
 
 ## Testing
 

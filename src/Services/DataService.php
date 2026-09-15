@@ -11,6 +11,7 @@ use Illuminate\Support\Collection as SupportCollection;
 use Spatie\LaravelData\DataCollection;
 use SplFileObject;
 use Carbon\Carbon;
+use Carbon\Exceptions\InvalidFormatException;
 use Nikoleesg\Survey\Models\Variable;
 use Nikoleesg\Survey\Models\OpenAnswer;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
@@ -20,6 +21,7 @@ use Nikoleesg\Survey\Data\ClosedAnswerData;
 use Nikoleesg\Survey\Data\AnswerData;
 use Nikoleesg\Survey\Exceptions\MissingSurveyIdException;
 use Nikoleesg\Survey\Exceptions\NoDataLoadedException;
+use Nikoleesg\Survey\Exceptions\UnparseableColumnException;
 use Nikoleesg\Survey\Exceptions\UnreadableFileException;
 
 class DataService implements Arrayable
@@ -70,6 +72,7 @@ class DataService implements Arrayable
      *
      * @throws MissingSurveyIdException
      * @throws UnreadableFileException
+     * @throws UnparseableColumnException
      */
     public function getClosedAnswersFromFile(string $fileName, ?string $surveyId = null): self
     {
@@ -108,6 +111,9 @@ class DataService implements Arrayable
         return $this;
     }
 
+    /**
+     * @throws UnparseableColumnException
+     */
     protected function getVariableAnswers(string $surveyId, int $interviewNumber, Collection $variables, string $string): DataCollection
     {
         $answers = [];
@@ -125,17 +131,20 @@ class DataService implements Arrayable
 
             // TODO: load open answer; load multiple open answer for multiple answer; calculation, dummy
             $data = match ($variable->type) {
-                VariableTypeEnum::SINGLE => (int)$contentOfColumns,
-                VariableTypeEnum::MULTIPLE => array_map('intval', str_split($contentOfColumns)),
-                VariableTypeEnum::NUMERICAL => $fraction > 0 ? (int)$contentOfColumns / pow(10, $fraction) : (int)$contentOfColumns,
                 VariableTypeEnum::OPEN => $this->getVerbatimText($surveyId, $interviewNumber, $startPosition, $length),
-                VariableTypeEnum::ALPHA => $contentOfColumns,
                 VariableTypeEnum::CALCULABLE => null,
                 VariableTypeEnum::MATRIX => null, // TODO: matrix answers
                 VariableTypeEnum::DUMMY => null,
-                VariableTypeEnum::DATETIME => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateTimeString(),
-                VariableTypeEnum::DATE => Carbon::createFromFormat('Y/m/d Hi:s', $contentOfColumns)->toDateString(),
-                VariableTypeEnum::TIME => Carbon::createFromFormat('Hi', $contentOfColumns)->toTimeString(),
+                // an all-blank column means not asked / not answered, never code 0
+                default => trim($contentOfColumns) === '' ? null : match ($variable->type) {
+                    VariableTypeEnum::SINGLE => (int)$contentOfColumns,
+                    VariableTypeEnum::MULTIPLE => array_map('intval', str_split($contentOfColumns)),
+                    VariableTypeEnum::NUMERICAL => $fraction > 0 ? (int)$contentOfColumns / pow(10, $fraction) : (int)$contentOfColumns,
+                    VariableTypeEnum::ALPHA => rtrim($contentOfColumns),
+                    VariableTypeEnum::DATETIME => $this->parseDateColumn($interviewNumber, $variable, 'datetime', $contentOfColumns)->toDateTimeString(),
+                    VariableTypeEnum::DATE => $this->parseDateColumn($interviewNumber, $variable, 'date', $contentOfColumns)->toDateString(),
+                    VariableTypeEnum::TIME => $this->parseDateColumn($interviewNumber, $variable, 'time', $contentOfColumns)->toTimeString(),
+                },
             };
 
             // answer keyed by variable slug; MULTIPLE is a list of 0/1 per code
@@ -155,13 +164,35 @@ class DataService implements Arrayable
     }
 
     /**
+     * Parse a non-blank date/time column with the configured survey.formats.{$format}.
+     *
+     * @throws UnparseableColumnException
+     */
+    protected function parseDateColumn(int $interviewNumber, Variable $variable, string $format, string $content): Carbon
+    {
+        $pattern = config("survey.formats.$format");
+
+        try {
+            $date = Carbon::createFromFormat($pattern, trim($content));
+        } catch (InvalidFormatException) {
+            $date = false;
+        }
+
+        if ($date === false) {
+            throw UnparseableColumnException::make($interviewNumber, $variable, $pattern, $content);
+        }
+
+        return $date;
+    }
+
+    /**
      * @param string $surveyId
-     * @param string $interviewNumber
+     * @param int $interviewNumber
      * @param int $position
      * @param int $length
      * @return string|null
      */
-    protected function getVerbatimText(string $surveyId, string $interviewNumber, int $position, int $length): ?string
+    protected function getVerbatimText(string $surveyId, int $interviewNumber, int $position, int $length): ?string
     {
         return OpenAnswer::query()
             ->whereHas('sample', fn ($query) => $query
