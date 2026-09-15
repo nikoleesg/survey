@@ -126,6 +126,24 @@ it('loads closed answers from file into a DataCollection', function () {
     unlink($file);
 });
 
+it('prefers an explicit survey id over setSurvey() when loading closed answers', function () {
+    // Regression for #15: the argument used to be clobbered by $this->surveyId.
+    $setA = Variable::create(['survey_id' => 'survey-a', 'name' => 'Q1', 'type' => VariableTypeEnum::SINGLE, 'position' => 41, 'length' => 1, 'fraction' => 0]);
+    $argB = Variable::create(['survey_id' => 'survey-b', 'name' => 'Q1', 'type' => VariableTypeEnum::SINGLE, 'position' => 41, 'length' => 1, 'fraction' => 0]);
+
+    $row = '00000001' . '01' . '00120' . '0005' . ' ' . 'INT00001' . '202401151030' . '7';
+    $file = writeFixture($row."\n");
+
+    $data = (new DataService())->setSurvey('survey-a')->getClosedAnswersFromFile($file, 'survey-b')->getData();
+
+    expect($data)->toHaveCount(1)
+        ->and($data[0]->survey_id)->toBe('survey-b')
+        ->and($data[0]->variable_id)->toBe($argB->id)
+        ->and($data[0]->variable_id)->not->toBe($setA->id);
+
+    unlink($file);
+});
+
 it('throws when persisting before any file is loaded', function () {
     (new DataService())->persist();
 })->throws(NoDataLoadedException::class);
