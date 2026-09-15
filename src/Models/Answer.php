@@ -8,6 +8,14 @@ use Spatie\LaravelData\WithData;
 use Nikoleesg\Survey\Traits\BelongsToSample;
 use Nikoleesg\Survey\Data\AnswerData;
 
+/**
+ * @property int $id
+ * @property int $sample_id
+ * @property int $variable_id
+ * @property array $result
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 class Answer extends Model
 {
     use BelongsToSample;
@@ -25,8 +33,22 @@ class Answer extends Model
 
     public const UPSERT_KEYS = ['sample_id', 'variable_id'];
 
+    /**
+     * The class bound to config('survey.closed_answer_model'): this model, or the
+     * consumer app's subclass of it.
+     *
+     * @return class-string<Answer>
+     */
+    public static function modelClass(): string
+    {
+        return config('survey.closed_answer_model');
+    }
+
+    /**
+     * @return BelongsTo<Variable, $this>
+     */
     public function variable(): BelongsTo
     {
-        return $this->belongsTo(config('survey.variable_model'), 'variable_id');
+        return $this->belongsTo(Variable::modelClass(), 'variable_id');
     }
 }

@@ -15,6 +15,27 @@ use Spatie\Sluggable\SlugOptions;
 use Nikoleesg\Survey\Data\VariableData;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
 
+/**
+ * @property int $id
+ * @property string $uuid
+ * @property string $survey_id
+ * @property string $name
+ * @property string $slug
+ * @property string|null $label
+ * @property VariableTypeEnum $type
+ * @property array|null $codes
+ * @property array|null $options
+ * @property int|null $position
+ * @property int|null $length
+ * @property int|null $fraction
+ * @property array|null $formula
+ * @property string|null $remark
+ * @property bool $is_dynamic
+ * @property bool $is_active
+ * @property int|null $order_column
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 class Variable extends Model implements Sortable
 {
     use HasUuids, BelongsToSurvey;
@@ -53,9 +74,23 @@ class Variable extends Model implements Sortable
         'sort_when_creating' => true,
     ];
 
+    /**
+     * The class bound to config('survey.variable_model'): this model, or the
+     * consumer app's subclass of it.
+     *
+     * @return class-string<Variable>
+     */
+    public static function modelClass(): string
+    {
+        return config('survey.variable_model');
+    }
+
+    /**
+     * @return HasMany<Answer, $this>
+     */
     public function answers(): HasMany
     {
-        return $this->hasMany(config('survey.closed_answer_model'), 'variable_id');
+        return $this->hasMany(Answer::modelClass(), 'variable_id');
     }
 
     public function scopeActive(Builder $query): void

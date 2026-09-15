@@ -20,6 +20,24 @@ use Nikoleesg\Survey\Traits\BelongsToSurvey;
  * interview_time_in_seconds, number_of_screens_shown, interrupt_indication,
  * interviewer_id, last_contact_at, odin_version, idle_time_in_seconds,
  * week_number, week_version_number, family_member_number, channel.
+ *
+ * @property int $id
+ * @property string $survey_id
+ * @property int $interview_number
+ * @property int|null $sub_questionnaire_number
+ * @property int|null $interview_time_in_seconds
+ * @property int|null $number_of_screens_shown
+ * @property InterruptIndicationEnum|null $interrupt_indication
+ * @property string|null $interviewer_id
+ * @property \Illuminate\Support\Carbon|null $last_contact_at
+ * @property string|null $odin_version
+ * @property int|null $idle_time_in_seconds
+ * @property int|null $week_number
+ * @property int|null $week_version_number
+ * @property int|null $family_member_number
+ * @property ChannelEnum|null $channel
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class Sample extends Model
 {
@@ -45,9 +63,23 @@ class Sample extends Model
 
     public const UPSERT_KEYS = ['survey_id', 'interview_number'];
 
+    /**
+     * The class bound to config('survey.sample_model'): this model, or the
+     * consumer app's subclass of it.
+     *
+     * @return class-string<Sample>
+     */
+    public static function modelClass(): string
+    {
+        return config('survey.sample_model');
+    }
+
+    /**
+     * @return HasMany<Answer, $this>
+     */
     public function answers(): HasMany
     {
-        return $this->hasMany(config('survey.closed_answer_model'), 'sample_id');
+        return $this->hasMany(Answer::modelClass(), 'sample_id');
     }
 
     /**
@@ -69,14 +101,19 @@ class Sample extends Model
         return $answers;
     }
 
+    /**
+     * @return HasMany<Paradata, $this>
+     */
     public function paradata(): HasMany
     {
-        return $this->hasMany(config('survey.paradata_model'), 'sample_id');
+        return $this->hasMany(Paradata::modelClass(), 'sample_id');
     }
 
     /**
      * The single paradata row for one label, e.g.
      * $sample->paradataOf(ParadataLabelEnum::DEVICE_ID)->first()?->result
+     *
+     * @return HasOne<Paradata, $this>
      */
     public function paradataOf(ParadataLabelEnum|string $label): HasOne
     {

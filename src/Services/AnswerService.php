@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use Carbon\Carbon;
+use Nikoleesg\Survey\Models\Answer;
+use Nikoleesg\Survey\Models\Paradata;
+use Nikoleesg\Survey\Models\Sample;
 use Nikoleesg\Survey\Models\Variable;
 use Nikoleesg\Survey\Enums\VariableTypeEnum;
 use Nikoleesg\Survey\Exceptions\MissingSurveyIdException;
@@ -19,8 +22,10 @@ class AnswerService
 
     protected array|null $interviewId;
 
+    /** @var class-string<Answer> */
     protected string $closedAnswerModel;
 
+    /** @var class-string<Paradata> */
     protected string $paradataAnswerModel;
 
     public function __construct(?string $surveyId = null, int|array|null $interviewId = null)
@@ -33,9 +38,9 @@ class AnswerService
             $this->setInterview($interviewId);
         }
 
-        $this->closedAnswerModel = config('survey.closed_answer_model');
+        $this->closedAnswerModel = Answer::modelClass();
 
-        $this->paradataAnswerModel = config('survey.paradata_model');
+        $this->paradataAnswerModel = Paradata::modelClass();
     }
 
     public function setSurvey(?string $surveyId): self
@@ -114,7 +119,7 @@ class AnswerService
         }
 
         // query
-        $builder = app($this->closedAnswerModel)->query()->with(['variable', 'sample']);
+        $builder = $this->closedAnswerModel::query()->with(['variable', 'sample']);
 
         $builder->whereHas('sample', function (Builder $query) use ($surveyId) {
             $query->ofSurvey($surveyId)

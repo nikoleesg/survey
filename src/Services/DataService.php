@@ -126,6 +126,8 @@ class DataService implements Arrayable
     }
 
     /**
+     * @param Collection<int, Variable> $variables
+     *
      * @throws UnparseableColumnException
      */
     protected function getVariableAnswers(string $surveyId, int $interviewNumber, Collection $variables, string $string): DataCollection
@@ -145,6 +147,8 @@ class DataService implements Arrayable
 
             // TODO: calculation, dummy
             $data = match ($variable->type) {
+                // excluded by the query above; loaded from the verbatim file instead
+                VariableTypeEnum::OPEN => throw new \LogicException("OPEN variable \"{$variable->name}\" has no closed answer column"),
                 VariableTypeEnum::CALCULABLE => null,
                 VariableTypeEnum::MATRIX => null, // TODO: matrix answers
                 VariableTypeEnum::DUMMY => null,
@@ -399,6 +403,7 @@ class DataService implements Arrayable
         $dataModel = match ($this->getData()->getDataClass()) {
             AnswerData::class   => config('survey.closed_answer_model'),
             ParadataData::class => config('survey.paradata_model'),
+            default             => throw new \LogicException('No model persists ' . $this->getData()->getDataClass()),
         };
 
         $this->persistSamples();
