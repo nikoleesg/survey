@@ -3,9 +3,9 @@
 namespace Nikoleesg\Survey\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use LaraUtil\Foundation\Traits\HasUuid;
 use Spatie\LaravelData\WithData;
 use Spatie\EloquentSortable\Sortable;
 use Spatie\EloquentSortable\SortableTrait;
@@ -17,10 +17,23 @@ use Nikoleesg\Survey\Enums\VariableTypeEnum;
 
 class Variable extends Model implements Sortable
 {
-    use HasUuid, HasTablePrefix;
+    use HasUuids, HasTablePrefix;
     use WithData, SortableTrait, HasSlug;
 
     protected $dataClass = VariableData::class;
+
+    /**
+     * Generate the uuid on a secondary column; `id` stays auto-incrementing.
+     */
+    public function uniqueIds(): array
+    {
+        return ['uuid'];
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
 
     protected $guarded = [];
 
