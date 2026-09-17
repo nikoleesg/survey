@@ -1,19 +1,13 @@
-# This is my package survey
+# nikoleesg/survey
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/nikoleesg/survey.svg?style=flat-square)](https://packagist.org/packages/nikoleesg/survey)
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/nikoleesg/survey/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/nikoleesg/survey/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/nikoleesg/survey/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/nikoleesg/survey/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/nikoleesg/survey.svg?style=flat-square)](https://packagist.org/packages/nikoleesg/survey)
 
-This is where your description should go. Limit it to a paragraph or two. Consider adding a small example.
-
-## Support us
-
-[<img src="https://github-ads.s3.eu-central-1.amazonaws.com/survey.jpg?t=1" width="419px" />](https://spatie.be/github-ad-click/survey)
-
-We invest a lot of resources into creating [best in class open source packages](https://spatie.be/open-source). You can support us by [buying one of our paid products](https://spatie.be/open-source/support-us).
-
-We highly appreciate you sending us a postcard from your hometown, mentioning which of our package(s) you are using. You'll find our address on [our contact page](https://spatie.be/about-us). We publish all received postcards on [our virtual postcard wall](https://spatie.be/open-source/postcards).
+Laravel package for importing fixed-width survey exports and reading persisted
+closed answers and paradata. Data is scoped by survey id and persisted in
+configurable Eloquent models.
 
 ## Installation
 
@@ -40,6 +34,12 @@ This is the contents of the published config file:
 
 ```php
 return [
+    'survey_id' => env('SURVEY_ID', 'default'),
+    'sample_model' => \Nikoleesg\Survey\Models\Sample::class,
+    'variable_model' => \Nikoleesg\Survey\Models\Variable::class,
+    'closed_answer_model' => \Nikoleesg\Survey\Models\Answer::class,
+    'paradata_model' => \Nikoleesg\Survey\Models\Paradata::class,
+    'persist_chunk_size' => 500,
 ];
 ```
 
@@ -52,8 +52,14 @@ php artisan vendor:publish --tag="survey-views"
 ## Usage
 
 ```php
-$survey = new Nikoleesg\Survey();
-echo $survey->echoPhrase('Hello, Nikoleesg!');
+use Nikoleesg\Survey\Facades\Answer;
+use Nikoleesg\Survey\Facades\Data;
+
+Data::setSurvey('household-2026')
+    ->getClosedAnswersFromFile(storage_path('imports/closed-answers.txt'))
+    ->persist();
+
+$answers = Answer::setSurvey('household-2026')->getAnswers();
 ```
 
 ## Exceptions
@@ -79,16 +85,16 @@ Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed re
 
 ## Contributing
 
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
+Please see the repository contribution guidelines for details.
 
 ## Security Vulnerabilities
 
-Please review [our security policy](../../security/policy) on how to report security vulnerabilities.
+Please report security vulnerabilities privately through GitHub's Security tab.
 
 ## Credits
 
 - [Niko Lee](https://github.com/nikoleesg)
-- [All Contributors](../../contributors)
+- [All Contributors](https://github.com/nikoleesg/survey/graphs/contributors)
 
 ## License
 
